@@ -1,0 +1,191 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7337927545099662248
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5826620444368698380}
+  - component: {fileID: 3058526890336698773}
+  - component: {fileID: 3500069346048301828}
+  m_Layer: 5
+  m_Name: Sound Source
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &5826620444368698380
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7337927545099662248}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 2.4954734, y: 2.3717875, z: 3.165}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 203.3354, y: 106.05688}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!82 &3058526890336698773
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7337927545099662248}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &3500069346048301828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7337927545099662248}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74d0f752e46640547a50aab4b0ae8095, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  soundList:
+  - name: Button
+    sfx:
+    - {fileID: 8300000, guid: 21695429d88413649a4b2e00053e28fc, type: 3}
+  - name: Footsteps
+    sfx:
+    - {fileID: 8300000, guid: defd082379aa4e14ca97360282434652, type: 3}
+    - {fileID: 8300000, guid: 2017a34fdb8fe9048bfadba3bf4eabfa, type: 3}
+    - {fileID: 8300000, guid: 3153ccf2ebdabd947afdbda7fa3ae182, type: 3}
+    - {fileID: 8300000, guid: 4e37d371bae18614ca7d7a2b45b5c934, type: 3}
+    - {fileID: 8300000, guid: f1c5118b8adfd5542847e462c26bc63f, type: 3}
+    - {fileID: 8300000, guid: 29d719bb5bcf4b2488747db5a8d72166, type: 3}
+  - name: SwordSwing
+    sfx:
+    - {fileID: 8300000, guid: 2b68f9dc123e8c8498b3cb5040c7d3b4, type: 3}
+    - {fileID: 8300000, guid: dce4de5d2ef1ebd4e8c483d5a60f6dfd, type: 3}
+    - {fileID: 8300000, guid: 5023a5090055653449380d9cc5727437, type: 3}
+    - {fileID: 8300000, guid: d0241f27485ac664895821a89c999769, type: 3}
+    - {fileID: 8300000, guid: 5b6131fd6a09b3842bece156e2d2db83, type: 3}
+  - name: Damage
+    sfx:
+    - {fileID: 8300000, guid: df88be6159b3d6c49ab1a5210fc7d8ab, type: 3}
+    - {fileID: 8300000, guid: b019f24ce7839684dacc629e5943f734, type: 3}
+  - name: Death
+    sfx: []
+  - name: Rerwards
+    sfx:
+    - {fileID: 8300000, guid: 91b619300bcc5754cbbbf1a7e87706db, type: 3}
+  - name: Skill_Spell
+    sfx:
+    - {fileID: 8300000, guid: adb183e302508f1489e17affc25d5cfe, type: 3}
+    - {fileID: 8300000, guid: 54272879c69b5c64598ea7ef72a85b30, type: 3}
+  - name: Skill_Shield
+    sfx:
+    - {fileID: 8300000, guid: 533d3ca282cc91f49acd3c44b43296fd, type: 3}
+    - {fileID: 8300000, guid: cd01312965508a74094b64ceb217cb2e, type: 3}
+    - {fileID: 8300000, guid: 1d7e6cac8fd306645b53f0186ef0a687, type: 3}
+    - {fileID: 8300000, guid: aff066ab7faa253458964e20c551f0ed, type: 3}
+    - {fileID: 8300000, guid: 8722af672fa68a4419cc571522b6c9fe, type: 3}
+    - {fileID: 8300000, guid: cfd58d00e5b1b7641944bc3fbdfc5c67, type: 3}
+  - name: Skill_Heal
+    sfx:
+    - {fileID: 8300000, guid: 5af146a52db6d1c40ba5f6f7ef49a28f, type: 3}
+  sfxSource: {fileID: 3058526890336698773}

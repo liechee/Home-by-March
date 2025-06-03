@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4bbe86429089d94bb4386f6dc957382, type: 3}
+  m_Name: Story2
+  m_EditorClassIdentifier: 
+  NPCName: Lyfjar
+  PlayerName: Ezenik
+  DialogueLines:
+  - lines:
+    - '"Greetings Marcher. I am Lyfjar. I am pleased to see you here with the first
+      shard."'
+  - lines:
+    - '"It was once a place of truths. Now we bury the past."'
+  - lines:
+    - '"Curiosity only brings sorrow."'
+  - lines:
+    - '"And yet silence is what cursed them."'
+  - lines:
+    - '"A Shard is buried here. But it is not silent. Go forth and find the second"'
+  ReturnLines:
+  - lines:
+    - "It's you. This place\u2026 it aches with thinking. With remembering.\""

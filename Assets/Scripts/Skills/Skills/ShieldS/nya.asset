@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c3ced775e126c04f85a9f1cceae9f1d, type: 3}
+  m_Name: nya
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: f992b8f266fef3943a9fc3712e80b6dd, type: 3}
+  spellName: Shield-nya~
+  description: Nyan~ The power of catpeople will give you a shocking amount of defense
+    (+4 :3) but in exchange, you get some psychic damage ^_^. Psychic damage may
+    vary uwu
+  shieldPrefab: {fileID: 871324411638548333, guid: 5fae79d5c764c3b44b9a080a80a0b852, type: 3}
+  duration: 5
+  defense: 4
+  soundref: 0

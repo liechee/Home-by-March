@@ -1,0 +1,20 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Story3 : NPC, ITalkable
+{
+    [SerializeField] private DialogueText dialogue;
+    [SerializeField] private DialogueController dialogueController;
+    [SerializeField] private GameObject cam;
+    public override void Interact()
+    {
+        cam.SetActive(true);
+        Talk(dialogue);
+    }
+
+    public void Talk(DialogueText dialogue)
+    {
+        dialogueController.DisplayDialogue(dialogue);
+    }
+}

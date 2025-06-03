@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4bbe86429089d94bb4386f6dc957382, type: 3}
+  m_Name: intro
+  m_EditorClassIdentifier: 
+  NPCName: ...
+  PlayerName: Ezenik
+  DialogueLines:
+  - lines:
+    - "\"You touched the Needle Shard. It opened the Gate. It only comes to those
+      who stop moving\u2014so they remember how to walk again.\"\r\r\n"
+  - lines:
+    - "\"It is a sliver of the Great Needle, once used to bind worlds. But it's been
+      broken\u2014like many things. One fragment found you. And now you\u2019re here.\"\r\n\r\r"
+  - lines:
+    - "\"A creature called the Stillheart Golem hoards the shard\u2019s echo\".\r"
+    - "\"It spreads stillness to everything it sees. If you want to return\u2026
+      you must take it back.\"\r\n"
+  - lines:
+    - "\"A creature called the Stillheart Golem hoards the shard\u2019s echo\".\r"
+    - "\"It spreads stillness to everything it sees. If you want to return\u2026
+      you must take it back.\"\r\n"
+    - '"Follow only the bricked road."'
+  ReturnLines:
+  - lines:
+    - " \"Where am I? What was that shard?\"\r"
+  - lines:
+    - "\"What am I supposed to do?\"\r\n\r"

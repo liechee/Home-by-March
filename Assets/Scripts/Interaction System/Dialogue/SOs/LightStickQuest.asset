@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4bbe86429089d94bb4386f6dc957382, type: 3}
+  m_Name: LightStickQuest
+  m_EditorClassIdentifier: 
+  NPCName: Old Woman Mabina
+  PlayerName: Ezenik
+  DialogueLines:
+  - lines:
+    - "\"Mmm\u2026 I remember a tale, old as the roots in this forest. They spoke
+      of a treasure \u2014 a gift left behind by a traveler who walked where no light
+      dared follow.\""
+  - lines:
+    - "\"Not gold, no\u2026 but something brighter. A rod of silver flame, they said,
+      warm to the touch, as if it remembered the hands that held it. The more one
+      held on to hope, the brighter it burned.\""
+  - lines:
+    - '"They say it pulsed like a heartbeat. Some claimed to hear music when they
+      gripped it tight and stood tall. A melody only the brave could hear."'
+  - lines:
+    - "\"It\u2019s still out there, you know. Waiting. But such treasures\u2026 they
+      find you only when you\u2019ve earned them.\""
+  ReturnLines: []

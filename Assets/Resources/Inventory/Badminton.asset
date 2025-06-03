@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Badminton
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: b7541debc71fa1b4dac1d43404b0b93b, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: ce0c097dda5e99f43b11e6073c7f06a4, type: 3}
+  stackable: 0
+  type: 2
+  description: Forged by a craftsman who marveled at the grace of a shuttle in flight,
+    this Badminton Racket feels weightless in the hand yet carries the strength of
+    a gale. Its strings hum softly when struck, as though channeling the energy of
+    the wind. Legends tell of it granting unmatched precision and speed, turning
+    every match into a dance of skill and spirit.
+  data:
+    Name: Badminton
+    Id: 36
+    buffs:
+    - attribute: 3
+      value: 12
+      min: 0
+      max: 0
+  skillData: {fileID: 0}
+  boneNames: []

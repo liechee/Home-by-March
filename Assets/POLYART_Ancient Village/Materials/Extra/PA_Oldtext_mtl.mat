@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: PA_Oldtext_mtl
-  m_Shader: {fileID: 4800000, guid: 8c3a1a4af217303479a4d99adc8b1935, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 3290604b90a8f244ebe65b5396bca262, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -83,11 +83,8 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _MaxDistance: 3
     - _Metallic: 0
-    - _MinDistance: 2
     - _OcclusionStrength: 1
-    - _Octaves: 8
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1

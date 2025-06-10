@@ -2451,7 +2451,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2559581983675941774, guid: 7fa42003425fac142ab63f374c01c2f7, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3187391736937315230, guid: 7fa42003425fac142ab63f374c01c2f7, type: 3}
       propertyPath: m_Pivot.x
@@ -3385,7 +3385,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &364761749
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15607,7 +15607,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1035111660657327752, guid: 16af33aaa3234c44b9503e186a7df9f7, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1304166744092929608, guid: 16af33aaa3234c44b9503e186a7df9f7, type: 3}
       propertyPath: m_Texture
@@ -19399,7 +19399,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6108995482085969184, guid: d61a023f68a711244b76eff801fc1bdf, type: 3}
       propertyPath: m_CastShadows
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6108995482085969184, guid: d61a023f68a711244b76eff801fc1bdf, type: 3}
       propertyPath: m_Materials.Array.size
@@ -19408,7 +19408,7 @@ PrefabInstance:
     - target: {fileID: 6108995482085969184, guid: d61a023f68a711244b76eff801fc1bdf, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: dc979030e946835458c81500758e672c, type: 2}
+      objectReference: {fileID: 2100000, guid: 56dcd0de3b8930c42b3b93a4ff76bebc, type: 2}
     - target: {fileID: 6108995482085969184, guid: d61a023f68a711244b76eff801fc1bdf, type: 3}
       propertyPath: m_Materials.Array.data[1]
       value: 

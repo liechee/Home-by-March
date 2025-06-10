@@ -156,6 +156,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2862749495059868863}
     m_Modifications:
+    - target: {fileID: 5103161067906796794, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5103161067906796794, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5103161067906796794, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 96
+      objectReference: {fileID: 0}
     - target: {fileID: 6504842710480228580, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_Name
       value: Boss Enemy Health

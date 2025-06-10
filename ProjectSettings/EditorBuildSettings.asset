@@ -21,7 +21,7 @@ EditorBuildSettings:
     path: Assets/Scenes/v2/Cutscene PH.unity
     guid: 15a950f8068afe44e8d19d603dcb834e
   - enabled: 1
-    path: Assets/Scenes/v2/Story1-1 v3 for map.unity
+    path: Assets/Scenes/v2/Story 1-1.unity
     guid: 1ecacaab5b82f724cbf3de154ac5f287
   - enabled: 1
     path: Assets/Scenes/v2/Story 1-2.unity

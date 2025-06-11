@@ -146,23 +146,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   musicSounds:
-  - {fileID: 8300000, guid: ade19ec00abd46841bafac226d573c73, type: 3}
-  - {fileID: 8300000, guid: 26a054c8c49bedd4282a3695cf58ec87, type: 3}
-  - {fileID: 8300000, guid: 8b9abde20bca37c439e213b8b6feb581, type: 3}
-  - {fileID: 8300000, guid: 47d8f2e5bd768c548aed1de95dffe318, type: 3}
+  - {fileID: 8300000, guid: 40ac39dff6e2f354f81de00e760e72fd, type: 3}
+  - {fileID: 8300000, guid: f7c94b00546f2484ea827051a05081a4, type: 3}
+  - {fileID: 8300000, guid: 2fb2b5c48f49da74eb9d076b874fc160, type: 3}
+  - {fileID: 8300000, guid: 826bb8ea4939f9340ba3d55e1120eb1f, type: 3}
   musicSource: {fileID: 2734728730681373092}
   sceneMusicMappings:
   - sceneName: Main Tutorial
-    musicClip: {fileID: 8300000, guid: ade19ec00abd46841bafac226d573c73, type: 3}
+    musicClip: {fileID: 8300000, guid: 40ac39dff6e2f354f81de00e760e72fd, type: 3}
   - sceneName: Main Screen
-    musicClip: {fileID: 8300000, guid: ade19ec00abd46841bafac226d573c73, type: 3}
+    musicClip: {fileID: 8300000, guid: 40ac39dff6e2f354f81de00e760e72fd, type: 3}
+  - sceneName: Cutscene PH
+    musicClip: {fileID: 0}
   - sceneName: Story Screen
-    musicClip: {fileID: 8300000, guid: ade19ec00abd46841bafac226d573c73, type: 3}
+    musicClip: {fileID: 8300000, guid: 40ac39dff6e2f354f81de00e760e72fd, type: 3}
   - sceneName: Story1-1
-    musicClip: {fileID: 8300000, guid: 26a054c8c49bedd4282a3695cf58ec87, type: 3}
+    musicClip: {fileID: 8300000, guid: f7c94b00546f2484ea827051a05081a4, type: 3}
   - sceneName: Story1-2 Main
-    musicClip: {fileID: 8300000, guid: 8b9abde20bca37c439e213b8b6feb581, type: 3}
+    musicClip: {fileID: 8300000, guid: 2fb2b5c48f49da74eb9d076b874fc160, type: 3}
   - sceneName: Story1-3 Main
-    musicClip: {fileID: 8300000, guid: 47d8f2e5bd768c548aed1de95dffe318, type: 3}
-  - sceneName: Maze
-    musicClip: {fileID: 8300000, guid: ade19ec00abd46841bafac226d573c73, type: 3}
+    musicClip: {fileID: 8300000, guid: 826bb8ea4939f9340ba3d55e1120eb1f, type: 3}

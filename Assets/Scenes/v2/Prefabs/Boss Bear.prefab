@@ -155,6 +155,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5053238887277201725}
     m_Modifications:
+    - target: {fileID: 522649998944556228, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: detectionAngle
+      value: 360
+      objectReference: {fileID: 0}
+    - target: {fileID: 2125258364706634999, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_text
+      value: The Denier
+      objectReference: {fileID: 0}
+    - target: {fileID: 2125258364706634999, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_fontSize
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 2125258364706634999, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 60
+      objectReference: {fileID: 0}
     - target: {fileID: 2562788814632119115, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_FillAmount
       value: 1
@@ -162,6 +178,10 @@ PrefabInstance:
     - target: {fileID: 6504842710480228580, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_Name
       value: Boss Enemy Health Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 7411632629014662098, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_SortingOrder
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7739578285231669974, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_text
@@ -279,7 +299,8 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 50.653748
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 8449330534854953680, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

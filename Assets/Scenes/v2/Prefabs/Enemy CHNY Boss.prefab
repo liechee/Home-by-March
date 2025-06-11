@@ -14,7 +14,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 71016949634261570, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: detectionRadius
-      value: 10
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 71016949634261570, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
+      propertyPath: innerDetectionRadius
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 1161504230817937179, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: maxHealth
@@ -46,7 +50,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2688189113178513086, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: m_StoppingDistance
-      value: 10
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 4426863891895979664, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: m_LocalScale.x
@@ -194,6 +198,10 @@ PrefabInstance:
     - target: {fileID: 6504842710480228580, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_Name
       value: Boss Enemy Health Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 7411632629014662098, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_SortingOrder
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7739578285231669974, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_text

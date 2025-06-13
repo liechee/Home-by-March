@@ -195,6 +195,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1935786034690207495}
     m_Modifications:
+    - target: {fileID: 478501446154521503, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: -944.3193
+      objectReference: {fileID: 0}
+    - target: {fileID: 478501446154521503, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 22.159668
+      objectReference: {fileID: 0}
     - target: {fileID: 6504842710480228580, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_Name
       value: Boss Enemy Health Variant

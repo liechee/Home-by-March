@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/Scenes/v2/UI/Entry Screen.unity
     guid: d7dac741fd85a004eaad686801c83514
   - enabled: 1
+    path: Assets/Scenes/v2/UI/LogIn Screen.unity
+    guid: eaf5880c363990242808a8cd551716de
+  - enabled: 0
     path: Assets/Scenes/v2/UI/Loading Screen 1.unity
     guid: 91d8d61f9fa5e3b418499a7a2eff38f3
   - enabled: 1

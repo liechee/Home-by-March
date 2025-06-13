@@ -43,6 +43,7 @@ public class DialogueController : MonoBehaviour
             foreach (GameObject obj in HideUI)
             {
                 obj.SetActive(false);
+                Debug.Log($"[DialogueController] Hiding UI element: {obj.name}");
             }
         }
     }
@@ -117,6 +118,16 @@ public class DialogueController : MonoBehaviour
         {
             gameObject.SetActive(true);
         }
+
+        // Hide UI elements when dialogue starts
+    if (HideUI != null && HideUI.Length > 0)
+    {
+        foreach (GameObject obj in HideUI)
+        {
+            obj.SetActive(false);
+            Debug.Log($"[DialogueController] Hiding UI element: {obj.name}");
+        }
+    }
 
         npcName = dialogue.NPCName;
         playerName = dialogue.PlayerName;

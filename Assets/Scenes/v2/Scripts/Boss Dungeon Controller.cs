@@ -15,7 +15,7 @@ public class BossDungeonController : MonoBehaviour
     public GameObject goldRewardPanel;
 
     public GameObject shardCollectionPanel;
-    public GameObject shardOn;
+    public GameObject[] shardOnImages;
     public GameObject congratulationsPanel;
     public Button continueButton;
     public GameObject dungeonfinisher;
@@ -24,8 +24,10 @@ public class BossDungeonController : MonoBehaviour
 
     public StoryLockController storyLockController;
     public int dungeonIndex;
-    public string itemClaimedKey = "RewardClaimed";
+    public int shardIndex;
+    // public string itemClaimedKey = "RewardClaimed";
     public SFXManager sfxManager;
+    private string itemClaimedKey => $"RewardClaimed_{dungeonIndex}";
 
     void Start()
     {
@@ -36,13 +38,25 @@ public class BossDungeonController : MonoBehaviour
         congratulationsPanel.SetActive(false);
         shardCollectionPanel.SetActive(false);
 
-        if (PlayerPrefs.GetInt("ShardCollected", 0) == 1 && shardOn != null)
+        // if (PlayerPrefs.GetInt("ShardCollected", 0) == 1 && shardOn != null)
+        // {
+        //     shardOn.SetActive(true);
+        // }
+        // else
+        // {
+        //     shardOn.SetActive(false);
+        // }
+        // Show collected shards
+        for (int i = 0; i < shardOnImages.Length; i++)
         {
-            shardOn.SetActive(true);
-        }
-        else
-        {
-            shardOn.SetActive(false);
+            if (PlayerPrefs.GetInt($"ShardCollected_{i}", 0) == 1)
+            {
+                shardOnImages[i].SetActive(true);
+            }
+            else
+            {
+                shardOnImages[i].SetActive(false);
+            }
         }
 
     }
@@ -94,13 +108,23 @@ public class BossDungeonController : MonoBehaviour
             shardCollectionPanel.SetActive(true);
             yield return WaitForPanelOrDelay(shardCollectionPanel);
 
-            // Activate Shard
-            if (shardOn != null)
+            // // Activate Shard
+            // if (shardOn != null)
+            // {
+            //     PlayerPrefs.SetInt("ShardCollected", 1);
+            //     PlayerPrefs.SetInt(itemClaimedKey, 1);
+            //     PlayerPrefs.Save();
+            //     shardOn.SetActive(true);
+            // }
+            // Collect the current shard
+            string shardKey = $"ShardCollected_{shardIndex}";
+            PlayerPrefs.SetInt(shardKey, 1);
+            PlayerPrefs.SetInt(itemClaimedKey, 1);
+            PlayerPrefs.Save();
+
+            if (shardIndex >= 0 && shardIndex < shardOnImages.Length)
             {
-                PlayerPrefs.SetInt("ShardCollected", 1);
-                PlayerPrefs.SetInt(itemClaimedKey, 1);
-                PlayerPrefs.Save();
-                shardOn.SetActive(true);
+                shardOnImages[shardIndex].SetActive(true);
             }
         }
 

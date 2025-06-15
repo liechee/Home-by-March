@@ -13,10 +13,8 @@ public abstract class NPC : MonoBehaviour, IInteractable
     [SerializeField] private Transform player;
     [SerializeField] private float interactRange = 1f;
     [SerializeField] private LayerMask interactLayer;
-    [SerializeField] private Button[] interactButton;
+    [SerializeField] private Button interactButton;
 
-
-    //[SerializeField] private int colliderCount;
     void Awake()
     {
         if (player == null)
@@ -25,49 +23,39 @@ public abstract class NPC : MonoBehaviour, IInteractable
             if (playerObj != null)
                 player = playerObj.transform;
         }
-    }
-
-
-
-    private void Start()
-    {
-        player = GameObject.FindGameObjectWithTag("Player").transform;
+        // Ensure interactSprite is hidden at start
+        if (interactSprite != null)
+            interactSprite.SetActive(false);
+        if (interactButton != null)
+            interactButton.gameObject.SetActive(false);
     }
 
     private void Update()
     {
+        bool canInteract = InteractionDistanceCheck();
 
-        if (Keyboard.current.eKey.wasPressedThisFrame && InteractionDistanceCheck())
+        if (Keyboard.current.eKey.wasPressedThisFrame && canInteract)
         {
             Interact();
             Debug.Log("Interacting with " + gameObject.name);
         }
 
-
-        if (interactSprite.gameObject.activeSelf && !InteractionDistanceCheck())
+        // Only show interactSprite if player is near
+        if (interactSprite != null)
         {
-            interactSprite.gameObject.SetActive(false);
+            interactSprite.SetActive(canInteract);
         }
-        else if (!interactSprite.gameObject.activeSelf && InteractionDistanceCheck())
+        if (interactButton != null)
         {
-            interactSprite.gameObject.SetActive(true);
+            interactButton.gameObject.SetActive(canInteract); // This toggles visibility
         }
-
     }
 
     public abstract void Interact();
 
     public bool InteractionDistanceCheck()
     {
-        // if (Vector3.Distance(player.position, transform.position) <= interactRange)
-        // {
-        //     return true;
-        // }
-        // else
-        // {
-        //     return false;
-        // }
-         if (player == null)
+        if (player == null)
         {
             Debug.LogError("Player reference is missing in NPC script!");
             return false;
@@ -75,17 +63,15 @@ public abstract class NPC : MonoBehaviour, IInteractable
 
         float distance = Vector3.Distance(player.position, transform.position);
         return distance <= interactRange;
-        // Your distance logic here
     }
+
     // Method to handle button click
     public void OnInteractButtonClicked()
     {
         if (InteractionDistanceCheck())
         {
-            // Cancel the player's attack
             Interact();
             Debug.Log("Interacting with " + gameObject.name);
         }
     }
-
 }

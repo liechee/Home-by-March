@@ -6,10 +6,8 @@ public class Story3 : NPC, ITalkable
 {
     [SerializeField] private DialogueText dialogue;
     [SerializeField] private DialogueController dialogueController;
-    [SerializeField] private GameObject cam;
     public override void Interact()
     {
-        cam.SetActive(true);
         Talk(dialogue);
     }
 

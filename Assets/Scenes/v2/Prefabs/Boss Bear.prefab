@@ -183,6 +183,10 @@ PrefabInstance:
       propertyPath: m_FillAmount
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 3378379096197052235, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -69
+      objectReference: {fileID: 0}
     - target: {fileID: 6504842710480228580, guid: a4828a4113c670847ab886e0b609ec81, type: 3}
       propertyPath: m_Name
       value: Boss Enemy Health Variant

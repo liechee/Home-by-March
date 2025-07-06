@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class PanelManager : MonoBehaviour
@@ -36,15 +37,15 @@ public class PanelManager : MonoBehaviour
         Debug.Log("Player data loaded after delay.");
     }
 
-    public void SaveInventoryToCloud(){
-        player.inventory.SaveInventoryToCloud("inventory");
-        player.equipment.SaveInventoryToCloud("equipment");
+    public async Task SaveInventoryToCloud(){
+        await player.inventory.SaveInventoryToCloud("inventory");
+        await player.equipment.SaveInventoryToCloud("equipment");
         Debug.Log("Player data saved to cloud.");
     }
 
-    public void LoadInventoryFromCloud(){
-        player.inventory.LoadInventoryFromCloud("inventory");
-        player.equipment.LoadInventoryFromCloud("equipment");
+    public async Task LoadInventoryFromCloud(){
+        await player.inventory.LoadInventoryFromCloud("inventory");
+        await player.equipment.LoadInventoryFromCloud("equipment");
         Debug.Log("Player data loaded from cloud.");
     }
 }

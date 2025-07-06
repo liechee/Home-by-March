@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using System.Text;
+using UnityEngine.Playables;
 using UnityEngine.UI;
 
 // [System.Serializable]
@@ -21,10 +23,10 @@ public class DialogueController : MonoBehaviour
 
     private Queue<string> npcLines = new Queue<string>();
     private Queue<string> playerLines = new Queue<string>();
-    private bool conversationEnded;
-    private bool isTyping;
-    private string currentLine;
-    private Coroutine dialogueCoroutine;
+    private bool conversationEnded = false;
+    private bool isTyping = false;
+    private string currentLine = "";
+    private Coroutine dialogueCoroutine = null;
     private const string HTML_ALPHA = "<color=#00000000>";
 
     [SerializeField] private GameObject[] HideUI = null;
@@ -38,16 +40,73 @@ public class DialogueController : MonoBehaviour
 
     private void Start()
     {
-        if (HideUI != null && HideUI.Length > 0)
-        {
-            foreach (GameObject obj in HideUI)
-            {
-                obj.SetActive(false);
-                Debug.Log($"[DialogueController] Hiding UI element: {obj.name}");
-            }
-        }
+
+        ToggleUI(HideUI, false); // Hide initially
     }
 
+    // public void DisplayDialogue(DialogueText dialogue)
+    // {
+    //     if (npcLines.Count == 0 && playerLines.Count == 0)
+    //     {
+    //         if (!conversationEnded)
+    //         {
+    //             StartConversation(dialogue);
+    //         }
+    //         else if (conversationEnded && !isTyping)
+    //         {
+    //             // If the conversation has ended and the player clicks, end the conversation
+    //             // and hide the dialogue UI.
+    //             EndConversation();
+    //             return;
+    //         }
+    //     }
+
+    //     if (!isTyping)
+    //     {
+
+    //         if (isNPCsTurn && npcLines.Count > 0)
+    //         {
+    //             currentLine = npcLines.Dequeue();
+    //             speakerNameText.text = npcName;
+    //         }
+    //         else if (!isNPCsTurn && playerLines.Count > 0)
+    //         {
+    //             currentLine = playerLines.Dequeue();
+    //             speakerNameText.text = playerName;
+    //         }
+    //         else
+    //         {
+    //             // If one queue is empty, fallback to the other
+    //             if (npcLines.Count > 0)
+    //             {
+    //                 currentLine = npcLines.Dequeue();
+    //                 speakerNameText.text = npcName;
+    //             }
+    //             else if (playerLines.Count > 0)
+    //             {
+    //                 currentLine = playerLines.Dequeue();
+    //                 speakerNameText.text = playerName;
+    //             }
+    //             else
+    //             {
+    //                 EndConversation();
+    //                 return;
+    //             }
+    //         }
+
+    //         isNPCsTurn = !isNPCsTurn;
+    //         dialogueCoroutine = StartCoroutine(TypeDialogueText(currentLine));
+    //     }
+    //     else
+    //     {
+    //         FinishTyping();
+    //     }
+
+    //     if (npcLines.Count == 0 && playerLines.Count == 0)
+    //     {
+    //         conversationEnded = true;
+    //     }
+    // }
     public void DisplayDialogue(DialogueText dialogue)
     {
         if (npcLines.Count == 0 && playerLines.Count == 0)
@@ -65,46 +124,44 @@ public class DialogueController : MonoBehaviour
             }
         }
 
-        if (!isTyping)
+        if (isTyping)
         {
+            FinishTyping();
+            return;
+        }
 
-            if (isNPCsTurn && npcLines.Count > 0)
-            {
-                currentLine = npcLines.Dequeue();
-                speakerNameText.text = npcName;
-            }
-            else if (!isNPCsTurn && playerLines.Count > 0)
-            {
-                currentLine = playerLines.Dequeue();
-                speakerNameText.text = playerName;
-            }
-            else
-            {
-                // If one queue is empty, fallback to the other
-                if (npcLines.Count > 0)
-                {
-                    currentLine = npcLines.Dequeue();
-                    speakerNameText.text = npcName;
-                }
-                else if (playerLines.Count > 0)
-                {
-                    currentLine = playerLines.Dequeue();
-                    speakerNameText.text = playerName;
-                }
-                else
-                {
-                    EndConversation();
-                    return;
-                }
-            }
-
-            isNPCsTurn = !isNPCsTurn;
-            dialogueCoroutine = StartCoroutine(TypeDialogueText(currentLine));
+        // Determine whose turn and who has available lines
+        if (isNPCsTurn && npcLines.Count > 0)
+        {
+            currentLine = npcLines.Dequeue();
+            speakerNameText.text = npcName;
+            isNPCsTurn = false;
+        }
+        else if (!isNPCsTurn && playerLines.Count > 0)
+        {
+            currentLine = playerLines.Dequeue();
+            speakerNameText.text = playerName;
+            isNPCsTurn = true;
+        }
+        else if (npcLines.Count > 0)
+        {
+            currentLine = npcLines.Dequeue();
+            speakerNameText.text = npcName;
+            isNPCsTurn = false;
+        }
+        else if (playerLines.Count > 0)
+        {
+            currentLine = playerLines.Dequeue();
+            speakerNameText.text = playerName;
+            isNPCsTurn = true;
         }
         else
         {
-            FinishTyping();
+            EndConversation();
+            return;
         }
+
+        dialogueCoroutine = StartCoroutine(TypeDialogueText(currentLine));
 
         if (npcLines.Count == 0 && playerLines.Count == 0)
         {
@@ -112,94 +169,155 @@ public class DialogueController : MonoBehaviour
         }
     }
 
+
     private void StartConversation(DialogueText dialogue)
     {
-        if (!gameObject.activeSelf)
-        {
-            gameObject.SetActive(true);
-        }
+        // if (!gameObject.activeSelf)
+        // {
+        //     gameObject.SetActive(true);
+        // }
 
-        // Hide UI elements when dialogue starts
-    if (HideUI != null && HideUI.Length > 0)
-    {
-        foreach (GameObject obj in HideUI)
-        {
-            obj.SetActive(false);
-            Debug.Log($"[DialogueController] Hiding UI element: {obj.name}");
-        }
-    }
+        // // Hide UI elements when dialogue starts
+        // if (HideUI != null && HideUI.Length > 0)
+        // {
+        //     foreach (GameObject obj in HideUI)
+        //     {
+        //         obj.SetActive(false);
+        //         Debug.Log($"[DialogueController] Hiding UI element: {obj.name}");
+        //     }
+        // }
+
+        // npcName = dialogue.NPCName;
+        // playerName = dialogue.PlayerName;
+
+        // npcLines.Clear();
+        // playerLines.Clear();
+
+        // foreach (DialogueSegment segment in dialogue.DialogueLines) // Use full name
+        // {
+        //     foreach (string line in segment.lines)
+        //     {
+        //         npcLines.Enqueue(line);
+        //     }
+        // }
+
+        // foreach (DialogueSegment segment in dialogue.ReturnLines) // Use full name
+        // {
+        //     foreach (string line in segment.lines)
+        //     {
+        //         playerLines.Enqueue(line);
+        //     }
+        // }
+
+        // isNPCsTurn = true;
+        // conversationEnded = false;
+        gameObject.SetActive(true);
+        ToggleUI(HideUI, false);
+        npcLines.Clear();
+        playerLines.Clear();
 
         npcName = dialogue.NPCName;
         playerName = dialogue.PlayerName;
 
-        npcLines.Clear();
-        playerLines.Clear();
-
-        foreach (DialogueSegment segment in dialogue.DialogueLines) // Use full name
-        {
-            foreach (string line in segment.lines)
-            {
+        foreach (var segment in dialogue.DialogueLines)
+            foreach (var line in segment.lines)
                 npcLines.Enqueue(line);
-            }
-        }
 
-        foreach (DialogueSegment segment in dialogue.ReturnLines) // Use full name
-        {
-            foreach (string line in segment.lines)
-            {
+        foreach (var segment in dialogue.ReturnLines)
+            foreach (var line in segment.lines)
                 playerLines.Enqueue(line);
-            }
-        }
 
-        isNPCsTurn = true;
+        // Determine starting turn
+        isNPCsTurn = npcLines.Count > 0 || playerLines.Count == 0;
+
         conversationEnded = false;
+        DisplayDialogue(null); // Trigger first line
 
     }
 
     private void EndConversation()
     {
+        // conversationEnded = false;
+        // if (gameObject.activeSelf)
+        // {
+        //     gameObject.SetActive(false);
+        // }
+        // if (HideUI != null && HideUI.Length > 0)
+        // {
+        //     foreach (GameObject obj in HideUI)
+        //     {
+        //         obj.SetActive(true); // Re-enable the UI elements
+        //     }
+        // }
+        // OnDialogueEnd?.Invoke();
         conversationEnded = false;
-        if (gameObject.activeSelf)
-        {
-            gameObject.SetActive(false);
-        }
-        if (HideUI != null && HideUI.Length > 0)
-        {
-            foreach (GameObject obj in HideUI)
-            {
-                obj.SetActive(true); // Re-enable the UI elements
-            }
-        }
+        gameObject.SetActive(false);
+        ToggleUI(HideUI, true);
         OnDialogueEnd?.Invoke();
     }
 
     private IEnumerator TypeDialogueText(string line)
     {
-        isTyping = true;
-        dialogueText.text = ""; // Clear the dialogue text before typing
-        string displayedText = "";
-        int alphaIndex = 0;
+        // isTyping = true;
+        // dialogueText.text = ""; // Clear the dialogue text before typing
+        // string displayedText = "";
+        // int alphaIndex = 0;
 
-        foreach (char c in line.ToCharArray())
+        // foreach (char c in line.ToCharArray())
+        // {
+        //     alphaIndex++;
+        //     displayedText = line.Substring(0, alphaIndex) + HTML_ALPHA + line.Substring(alphaIndex);
+        //     dialogueText.text = displayedText;
+        //     yield return new WaitForSeconds(maxTime / typingSpeed);
+        // }
+
+        // dialogueText.text = line; // Ensure the full line is displayed at the end
+        // isTyping = false;
+        isTyping = true;
+        dialogueText.text = "";
+
+        StringBuilder builder = new StringBuilder(line.Length * 2);
+        int len = line.Length;
+
+        for (int i = 0; i <= len; i++)
         {
-            alphaIndex++;
-            displayedText = line.Substring(0, alphaIndex) + HTML_ALPHA + line.Substring(alphaIndex);
-            dialogueText.text = displayedText;
+            builder.Clear();
+            builder.Append(line.Substring(0, i));
+            builder.Append(HTML_ALPHA);
+            if (i < len) builder.Append(line.Substring(i));
+            dialogueText.text = builder.ToString();
             yield return new WaitForSeconds(maxTime / typingSpeed);
         }
 
-        dialogueText.text = line; // Ensure the full line is displayed at the end
+        dialogueText.text = line;
         isTyping = false;
     }
 
     private void FinishTyping()
     {
-        StopCoroutine(dialogueCoroutine);
+        // StopCoroutine(dialogueCoroutine);
+        // dialogueText.text = currentLine;
+        // isTyping = false;
+        if (dialogueCoroutine != null)
+        {
+            StopCoroutine(dialogueCoroutine);
+            dialogueCoroutine = null;
+        }
+
         dialogueText.text = currentLine;
         isTyping = false;
     }
     public void OnContinueButtonPressed()
     {
         DisplayDialogue(null); // Pass null; it won't restart because dialogue queues are already filled
+    }
+    private void ToggleUI(GameObject[] elements, bool active)
+    {
+        if (elements == null) return;
+        for (int i = 0; i < elements.Length; i++)
+        {
+            if (elements[i] != null)
+                elements[i].SetActive(active);
+        }
     }
 }

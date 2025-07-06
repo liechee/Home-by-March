@@ -1,8 +1,7 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-
 using UnityEngine.Playables;
+
 public class ChapterController : MonoBehaviour
 {
     [Header("Chapter Settings")]
@@ -12,42 +11,50 @@ public class ChapterController : MonoBehaviour
     public string chapterKeyPrefix = "ChapterPlayed_";
     public string positionKeyPrefix = "PlayerPos_";
 
-    void Start()
-    {
-        if (player == null)
-        {
-            Debug.LogError("[ChapterManager] Player reference is missing!");
-            return;
-        }
-
+    void Update()
+{
+    if (Input.GetKeyDown(KeyCode.F9))
         LoadPlayerPosition();
+}
 
-        string chapterKey = chapterKeyPrefix + chapterIndex;
-
-        if (PlayerPrefs.GetInt(chapterKey, 0) == 0)
+    IEnumerator Start()
+    {
+    // Try to auto-find player if not assigned
+    if (player == null)
+    {
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj != null)
+            player = playerObj.transform;
+        else
         {
-            Debug.Log("[ChapterManager] First time playing chapter, playing timeline.");
-            if (timelineDirector != null)
-            {
-                timelineDirector.gameObject.SetActive(true);
-                timelineDirector.Play();
-            }
-
-            PlayerPrefs.SetInt(chapterKey, 1);
-            PlayerPrefs.Save();
+            Debug.LogError("[ChapterManager] Player reference is missing and no tagged object found!");
+            yield break;
         }
     }
 
-    void OnApplicationQuit()
-    {
-        SavePlayerPosition();
-    }
+    // Wait one frame to let Unity finish instantiating the scene
+    yield return new WaitForEndOfFrame();
 
-    void OnApplicationPause(bool pause)
+    LoadPlayerPosition();
+
+    string chapterKey = chapterKeyPrefix + chapterIndex;
+
+    if (PlayerPrefs.GetInt(chapterKey, 0) == 0)
     {
-        if (pause)
-            SavePlayerPosition();
+        Debug.Log("[ChapterManager] First time playing chapter, playing timeline.");
+        if (timelineDirector != null)
+        {
+            timelineDirector.gameObject.SetActive(true);
+            timelineDirector.Play();
+        }
+
+        PlayerPrefs.SetInt(chapterKey, 1);
+        PlayerPrefs.Save();
     }
+}
+
+    void OnApplicationQuit() => SavePlayerPosition();
+    void OnApplicationPause(bool pause) { if (pause) SavePlayerPosition(); }
 
     public void SavePlayerPosition()
     {
@@ -71,6 +78,7 @@ public class ChapterController : MonoBehaviour
         string keyX = positionKeyPrefix + chapterIndex + "_X";
         string keyY = positionKeyPrefix + chapterIndex + "_Y";
         string keyZ = positionKeyPrefix + chapterIndex + "_Z";
+        Debug.Log($"[ChapterManager] Attempting to load position for Chapter {chapterIndex}");
 
         if (PlayerPrefs.HasKey(keyX) && PlayerPrefs.HasKey(keyY) && PlayerPrefs.HasKey(keyZ))
         {
@@ -81,7 +89,11 @@ public class ChapterController : MonoBehaviour
             );
 
             player.position = pos;
-            Debug.Log("[ChapterManager] Player position loaded.");
+            Debug.Log("[ChapterManager] Player position loaded: " + pos);
+        }
+        else
+        {
+            Debug.Log("[ChapterManager] No saved position found for chapter " + chapterIndex);
         }
     }
 }

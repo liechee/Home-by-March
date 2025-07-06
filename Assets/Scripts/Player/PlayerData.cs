@@ -47,6 +47,7 @@ public class PlayerData : MonoBehaviour
     {
         // Default values for a new player
         playerName = "New Player";
+        level = 1;
         health = 100;
         attack = 10;
         defense = 5;
@@ -141,6 +142,7 @@ public class PlayerData : MonoBehaviour
 
         data = new PlayerDataSaver();
         data.playerName = playerName;
+        data.level = level;
         data.health = health;
         data.attack = attack;
         data.defense = defense;
@@ -175,34 +177,57 @@ public class PlayerData : MonoBehaviour
 
     }
 
-    public async void SavePlayerDataToCloud()
+    public async Task SavePlayerDataToCloud()
     {
 
-        CloudSaver.SaveDataToCloud("playerData", data);
-
-
+        await CloudSaver.SaveDataToCloud("playerData", data);
+        
     }
 
-    public async void LoadPlayerDataFromCloud()
+    public async Task LoadPlayerDataFromCloud()
     {
-        string playerDataJson = await CloudSaver.LoadDataFromCloud("playerData");
-        data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
-        Debug.Log(data.playerName);
+        // string playerDataJson = await CloudSaver.LoadDataFromCloud("playerData");
+        // data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
+        // Debug.Log(data.playerName);
 
 
-        SetPlayerStats(data);
-        SavePlayerData();
+        // SetPlayerStats(data);
+        // SavePlayerData();
+        try
+        {
+            string playerDataJson = await CloudSaver.LoadDataFromCloud("playerData");
+
+            if (!string.IsNullOrEmpty(playerDataJson))
+            {
+                data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
+                SetPlayerStats(data);
+                SavePlayerData(); // Save locally after loading from cloud
+                Debug.Log("Cloud player data loaded successfully.");
+            }
+            else
+            {
+                Debug.LogWarning("No cloud data found. Falling back to local.");
+                LoadPlayerData(); // fallback to local
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Failed to load from cloud: {e.Message}. Falling back to local.");
+            LoadPlayerData(); // fallback
+        }
 
     }
 
     public void SetPlayerStats(PlayerDataSaver playerData)
     {
         playerName = playerData.playerName;
+        level = playerData.level;
         health = playerData.health;
         attack = playerData.attack;
         defense = playerData.defense;
         gold = playerData.gold;
         attackSpeed = playerData.attackSpeed;
+        UpdateCurrentStats();
 
         Debug.Log("player stats set!");
     }
@@ -212,9 +237,6 @@ public class PlayerData : MonoBehaviour
         playerName = name;
         SavePlayerData();
     }
-
-
-
 
 
 }

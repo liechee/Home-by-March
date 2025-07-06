@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.IO;
 using Repforge.StepCounterPro;
+using System.Threading.Tasks;
 
 namespace CoppraGames
 {
@@ -377,14 +378,14 @@ namespace CoppraGames
 
         }
 
-        public async void SaveDailyQuestProgressToCloud()
+        public async Task SaveDailyQuestProgressToCloud()
         {
 
-            CloudSaver.SaveDataToCloud("dailyQuestProgress", dailyQuestProgress);
+           await CloudSaver.SaveDataToCloud("dailyQuestProgress", dailyQuestProgress);
 
         }
 
-        public async void LoadPlayerDataFromCloud()
+        public async Task LoadPlayerDataFromCloud()
         {
             string dailyQuestProgressJson = await CloudSaver.LoadDataFromCloud("dailyQuestProgress");
             dailyQuestProgress.areDailyQuestsClaimed = JsonUtility.FromJson<DailyQuestProgress>(dailyQuestProgressJson).areDailyQuestsClaimed;

@@ -61,7 +61,7 @@ namespace HomeByMarch
             }
 
             PlayerHealth = Player?.GetComponent<Health>();
-            Debug.Log($"PlayerHealth component: {PlayerHealth}");
+            //Debug.Log($"PlayerHealth component: {PlayerHealth}");
 
             if (PlayerHealth == null)
             {
@@ -69,7 +69,7 @@ namespace HomeByMarch
             }
 
             currentHealth = maxHealth;
-            Debug.Log($"Enemy initialized with health: {currentHealth}/{maxHealth}");
+            //Debug.Log($"Enemy initialized with health: {currentHealth}/{maxHealth}");
         }
 
         void Start()
@@ -126,7 +126,7 @@ namespace HomeByMarch
                 Debug.LogWarning("Health bar is not assigned.");
             }
             //healthBar.fillAmount = Mathf.Clamp(currentHealth / maxHealth, 0.0f, 1.0f);
-            Debug.Log($"Enemy{healthBar.fillAmount * 100}%");
+            //Debug.Log($"Enemy{healthBar.fillAmount * 100}%");
 
             // Show health bar only when health is below max or player is detected
             healthBarPrefab.SetActive(currentHealth < maxHealth || playerDetector.CanDetectPlayer());

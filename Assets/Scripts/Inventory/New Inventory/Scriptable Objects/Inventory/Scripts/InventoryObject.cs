@@ -5,6 +5,8 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 using UnityEditor;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
+using System;
 
 
 public enum InterfaceType
@@ -104,61 +106,170 @@ public class InventoryObject : ScriptableObject
         stream.Close();
     }
 
-    public async void SaveInventoryToCloud(string fileName)
+    public async Task SaveInventoryToCloud(string fileName)
     {
+        Save();
+
+        // Always serialize from the current in-memory inventory
+        string inventoryData = JsonUtility.ToJson(Container, true);
+        Debug.Log("Saving Inventory Data: " + inventoryData);
+
+        await CloudSaver.SaveDataToCloud(fileName, inventoryData);
+        Debug.Log($"[CloudSaver] Uploading {fileName}: {JsonUtility.ToJson(inventoryData)}");
+
         // Load the inventory data from the local file first
-        if (File.Exists(string.Concat(Application.persistentDataPath, savePath)))
-        {
-            IFormatter formatter = new BinaryFormatter();
-            Stream stream = new FileStream(string.Concat(Application.persistentDataPath, savePath), FileMode.Open, FileAccess.Read);
-            Inventory newContainer = (Inventory)formatter.Deserialize(stream);
-            stream.Close();
+        // if (File.Exists(string.Concat(Application.persistentDataPath, savePath)))
+        // {
+        //     IFormatter formatter = new BinaryFormatter();
+        //     Stream stream = new FileStream(string.Concat(Application.persistentDataPath, savePath), FileMode.Open, FileAccess.Read);
+        //     Inventory newContainer = (Inventory)formatter.Deserialize(stream);
+        //     stream.Close();
 
-            // Log the inventory data before saving
-            string inventoryData = JsonUtility.ToJson(newContainer, true);
-            Debug.Log("Saving Inventory Data: " + inventoryData);  // Log the data for debugging purposes
+        //     // Log the inventory data before saving
+        //     string inventoryData = JsonUtility.ToJson(newContainer, true);
+        //     Debug.Log("Saving Inventory Data: " + inventoryData);  // Log the data for debugging purposes
 
-            // Save the inventory data to the cloud
-            CloudSaver.SaveDataToCloud(fileName, inventoryData);
-        }
-        else
-        {
-            Debug.LogError("Inventory file not found!");
-        }
+        //     // Save the inventory data to the cloud
+        //     await CloudSaver.SaveDataToCloud(fileName, inventoryData);
+        // }
+        // else
+        // {
+        //     Debug.LogError("Inventory file not found!");
+        // }
+        // Save();
+        // string path = Path.Combine(Application.persistentDataPath, savePath);
+        // if (File.Exists(path))
+        // {
+        //     string json = File.ReadAllText(path);
+        //     await CloudSaver.SaveDataToCloud(fileName, json);
+        // }
+        // else
+        // {
+        //     Debug.LogError("Inventory file not found.");
+        // }
     }
 
-    public async void LoadInventoryFromCloud(string fileName)
+    public async Task LoadInventoryFromCloud(string fileName)
     {
-        // Load the inventory data from the cloud
-        string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);  // Assuming LoadDataFromCloud is an async method
+        // // Load the inventory data from the cloud
+        // string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);  // Assuming LoadDataFromCloud is an async method
 
+        // if (!string.IsNullOrEmpty(inventoryData))
+        // {
+        //     // Log the loaded data for debugging
+        //     Debug.Log("Loaded Inventory Data: " + inventoryData);
+
+        //     // Deserialize the inventory data
+        //     Inventory loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
+
+        //     // Now update the slots in the game with the loaded data
+        //     for (int i = 0; i < GetSlots.Length; i++)
+        //     {
+        //         GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
+        //     }
+
+        //     Save();
+        // }
+        // else
+        // {
+        //     Debug.LogError("Failed to load inventory data from the cloud.");
+        // }
+        // Load the inventory data from the cloud
+
+
+
+        // number 2
+        // string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);
+
+        // if (!string.IsNullOrEmpty(inventoryData))
+        // {
+        //     Debug.Log("Loaded Inventory Data: " + inventoryData);
+
+        //     Inventory loadedContainer = null;
+        //     try
+        //     {
+        //         loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
+        //     }
+        //     catch (System.Exception e)
+        //     {
+        //         Debug.LogError("Failed to deserialize inventory data: " + e.Message);
+        //     }
+
+        //     if (loadedContainer != null && loadedContainer.Slots != null && loadedContainer.Slots.Length == GetSlots.Length)
+        //     {
+        //         for (int i = 0; i < GetSlots.Length; i++)
+        //         {
+        //             GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
+        //         }
+        //         Save();
+        //     }
+        //     else
+        //     {
+        //         Debug.LogError("Loaded inventory data is invalid or slot count mismatch.");
+        //     }
+        // }
+        // else
+        // {
+        //     Debug.LogError("Failed to load inventory data from the cloud.");
+        // }
+        string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);
+
+        Debug.Log("Loaded Inventory Data: " + inventoryData);
         if (!string.IsNullOrEmpty(inventoryData))
         {
-            // Log the loaded data for debugging
             Debug.Log("Loaded Inventory Data: " + inventoryData);
 
-            // Deserialize the inventory data
-            Inventory loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
-
-            // Now update the slots in the game with the loaded data
-            for (int i = 0; i < GetSlots.Length; i++)
+            Inventory loadedContainer = null;
+            try
             {
-                GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
+                loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("Failed to deserialize inventory data: " + e.Message);
             }
 
-            Save();
+            if (loadedContainer != null && loadedContainer.Slots != null)
+            {
+                // If slot count matches, just update
+                if (loadedContainer.Slots.Length == GetSlots.Length)
+                {
+                    for (int i = 0; i < GetSlots.Length; i++)
+                    {
+                        GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
+                    }
+                    Save();
+                    Debug.Log("Inventory loaded from cloud and applied to slots.");
+                }
+                // If slot count does NOT match, try to migrate
+                else
+                {
+                    Debug.LogWarning($"Slot count mismatch: loaded={loadedContainer.Slots.Length}, current={GetSlots.Length}. Attempting to migrate.");
+                    int minSlots = Mathf.Min(loadedContainer.Slots.Length, GetSlots.Length);
+                    for (int i = 0; i < minSlots; i++)
+                    {
+                        GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
+                    }
+                    // Fill remaining slots with empty items if needed
+                    for (int i = minSlots; i < GetSlots.Length; i++)
+                    {
+                        GetSlots[i].UpdateSlot(new Item(), 0);
+                    }
+                    Save();
+                    Debug.Log("Inventory loaded with migration for slot count mismatch.");
+                }
+            }
+            else
+            {
+                Debug.LogError("Loaded inventory data is invalid.");
+            }
         }
         else
         {
             Debug.LogError("Failed to load inventory data from the cloud.");
         }
+        Save();
     }
-
-
-
-
-
-
     [ContextMenu("Load")]
     public void Load()
     {
@@ -185,6 +296,7 @@ public class InventoryObject : ScriptableObject
         Container.Clear();
     }
 }
+
 [System.Serializable]
 public class Inventory
 {

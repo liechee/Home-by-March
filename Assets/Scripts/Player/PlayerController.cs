@@ -113,7 +113,7 @@ namespace HomeByMarch
                 m_Body.velocity = (Vector3)stream.ReceiveNext();
 
                 // Apply lag compensation
-                float lag = Mathf.Abs((float)(PhotonNetwork.Time - info.timestamp));
+                float lag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
                 networkPosition += m_Body.velocity * lag;
             }
         }

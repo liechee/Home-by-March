@@ -926,7 +926,7 @@ PlayerSettings:
   XboxOneOverrideIdentityPublisher: 
   vrEditorSettings: {}
   cloudServicesEnabled:
-    Purchasing: 0
+    Purchasing: 1
   luminIcon:
     m_Name: 
     m_ModelFolderPath: 
@@ -946,11 +946,11 @@ PlayerSettings:
   apiCompatibilityLevel: 6
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 5899395f-3148-408d-b0d9-4a01f4aa4301
+  cloudProjectId: b116492a-1760-40b1-9ad8-5a9c3506a6fa
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: homebymarch 2024-08-28_06-38-23
-  organizationId: d_a_v00
+  projectName: homebymarch (1)
+  organizationId: little_lies
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

@@ -18,7 +18,7 @@ public class StepData{
 
 }
 
-
+[System.Serializable]
 public class PlayerPositionData{
   public float playerXPosition;
   public float playerYPosition;

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -7,6 +8,8 @@ public class StaticInterface : UserInterface
 {
     public GameObject[] slots;
     private static StaticInterface instance;
+    [Header("Cloud Settings")]
+    public string cloudFileName = "PlayerEquip";
 
     void Awake()
     {
@@ -42,5 +45,71 @@ public class StaticInterface : UserInterface
             slotsOnInterface.Add(obj, inventory.GetSlots[i]);
 
         }
+    }
+    // CLOUD SAVE/LOAD METHODS
+
+    // public async Task SaveInventoryToCloudButton()
+    // {
+    //     if (inventory != null)
+    //     {
+    //         await inventory.SaveInventoryToCloud("PlayerEquip");
+    //         Debug.Log("Cloud Save triggered.");
+    //     }
+    //     else
+    //     {
+    //         Debug.LogWarning("Inventory reference is missing.");
+    //     }
+    // }
+
+    // public async Task LoadInventoryFromCloudButton()
+    // {
+    //     if (inventory != null)
+    //     {
+    //         await inventory.LoadInventoryFromCloud("PlayerEquip");
+    //         Debug.Log("Cloud Load triggered.");
+    //     }
+    //     else
+    //     {
+    //         Debug.LogWarning("Inventory reference is missing.");
+    //     }
+    // }
+    public async Task SaveInventoryToCloudButton()
+    {
+        if (inventory != null)
+        {
+            await inventory.SaveInventoryToCloud(cloudFileName);
+            Debug.Log($"[StaticInterface] Cloud save to '{cloudFileName}' completed.");
+        }
+        else
+        {
+            Debug.LogWarning("[StaticInterface] Inventory reference is missing.");
+        }
+    }
+
+    public async Task LoadInventoryFromCloudButton()
+    {
+        if (inventory != null)
+        {
+            await inventory.LoadInventoryFromCloud(cloudFileName);
+            Debug.Log($"[StaticInterface] Cloud load from '{cloudFileName}' completed.");
+        }
+        else
+        {
+            Debug.LogWarning("[StaticInterface] Inventory reference is missing.");
+        }
+    }
+
+    // ===============================
+    // UI BUTTON WRAPPERS (Non-async)
+    // ===============================
+
+    public void OnSave()
+    {
+        _ = SaveInventoryToCloudButton(); // Fire-and-forget
+    }
+
+    public void OnLoad()
+    {
+        _ = LoadInventoryFromCloudButton(); // Fire-and-forget
     }
 }

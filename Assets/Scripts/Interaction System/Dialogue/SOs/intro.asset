@@ -26,9 +26,6 @@ MonoBehaviour:
     - "\"It spreads stillness to everything it sees. If you want to return\u2026
       you must take it back.\"\r\n"
   - lines:
-    - "\"A creature called the Stillheart Golem hoards the shard\u2019s echo\".\r"
-    - "\"It spreads stillness to everything it sees. If you want to return\u2026
-      you must take it back.\"\r\n"
     - '"Follow only the bricked road."'
   ReturnLines:
   - lines:

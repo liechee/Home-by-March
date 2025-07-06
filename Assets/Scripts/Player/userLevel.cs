@@ -4,10 +4,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using HomeByMarch;
-
+using System;
 public class UserLevel : MonoBehaviour
 {
     [SerializeField] public TMP_Text levelText;
+    [SerializeField] public TMP_Text levelTextOutside;
     public TMP_Text currentStepCountText;
     public TMP_Text currentStepCountTextOutside;
     public TMP_Text totalStepsForNextLevelText;
@@ -32,35 +33,71 @@ public class UserLevel : MonoBehaviour
 
     private string stepJsonFilePath;
     private string stepCountData;
+    private OverallStepCounter stepCounter;
+    private bool cloudStepDataLoaded = false;
+    private StepData currentStepData;
 
     void Awake()
     {
         stepJsonFilePath = Application.persistentDataPath + "/stepData.json";
 
-        // Check if the step data file exists before trying to read it
+        // Load from file as fallback
         if (File.Exists(stepJsonFilePath))
         {
-            stepCountData = File.ReadAllText(stepJsonFilePath);
+            string json = File.ReadAllText(stepJsonFilePath);
+            currentStepData = JsonUtility.FromJson<StepData>(json);
         }
         else
         {
-            Debug.LogWarning("Step data file not found. Creating a new file with default data.");
-            File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(new StepData()));
-            stepCountData = File.ReadAllText(stepJsonFilePath);
+            Debug.LogWarning("Step data file not found. Creating a new one.");
+            currentStepData = new StepData();
+            File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(currentStepData));
         }
 
-        // Load PlayerData from the scene
         playerData = FindObjectOfType<PlayerData>();
-
-        // Initialize user level and steps
         InitializeUserLevelAndSteps();
+
+        stepCounter = FindObjectOfType<OverallStepCounter>();
+        if (stepCounter != null)
+        {
+            OverallStepCounter.onLoaded += OnStepDataReadyFromCloud;
+        }
+
+        if (stepCounter?.stepData != null && stepCounter.overallSteps > 0)
+        {
+            OnStepDataReadyFromCloud();
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (stepCounter != null)
+        {
+            OverallStepCounter.onLoaded -= OnStepDataReadyFromCloud;
+        }
+    }
+
+    void OnStepDataReadyFromCloud()
+    {
+        Debug.Log("Cloud step data is ready. Refreshing UI...");
+
+        currentStepData = stepCounter.stepData;
+        cloudStepDataLoaded = true;
+
+        InitializeUserLevelAndSteps();
+        UpdateInformation();
+        UpdateText();
+        UpdateExperienceBar();
     }
 
     void Update()
     {
-        UpdateInformation();
-        UpdateText();
-        UpdateExperienceBar();
+        if (!cloudStepDataLoaded)
+        {
+            UpdateInformation();
+            UpdateText();
+            UpdateExperienceBar();
+        }
     }
 
     void InitializeUserLevelAndSteps()
@@ -69,25 +106,18 @@ public class UserLevel : MonoBehaviour
 
         try
         {
-            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
-
-            dailyStepCount = data.dailySteps;
-            overallStepCount = data.overallSteps;
-
-            Debug.Log($"Loaded Step Data - Daily: {dailyStepCount}, Overall: {overallStepCount}");
+            dailyStepCount = currentStepData.dailySteps;
+            overallStepCount = currentStepData.overallSteps;
 
             int totalStepsForCurrentLevel = CalculateTotalStepsForLevel(playerData.level);
             totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
             remainingStepsForNextLevel = totalStepsForNextLevel - overallStepCount;
 
-            Debug.Log($"Level: {playerData.level}, Steps for Current Level: {totalStepsForCurrentLevel}, Next Level: {totalStepsForNextLevel}");
-
             if (playerData.level != playerData.lastSavedLevel)
             {
-                Debug.LogWarning("Level mismatch detected. Correcting level...");
+                Debug.LogWarning("Level mismatch detected. Correcting...");
                 for (int i = playerData.lastSavedLevel; i < playerData.level; i++)
                 {
-                    Debug.Log($"Applying Level-Up for level {i + 1}");
                     playerData.LevelUp();
                     playerData.lastSavedLevel++;
                 }
@@ -97,7 +127,6 @@ public class UserLevel : MonoBehaviour
             while (overallStepCount >= CalculateTotalStepsForLevel(playerData.level + 1))
             {
                 playerData.level++;
-                Debug.Log($"Level Up! New Level: {playerData.level}");
                 playerData.LevelUp();
                 playerData.lastSavedLevel = playerData.level;
             }
@@ -118,22 +147,26 @@ public class UserLevel : MonoBehaviour
 
     void UpdateText()
     {
-        string colorTagOpen = "<color=#FFEE00>"; // red
-    string colorTagClose = "</color>";
-    
+        string colorOpen = "<color=#FFEE00>";
+        string colorClose = "</color>";
+
         levelText.text = playerData.level.ToString();
+        levelTextOutside.text = levelText.text;
 
-        currentStepCountText.text = "Daily steps: " + colorTagOpen + dailyStepCount + colorTagClose;
-
+        currentStepCountText.text = "Daily steps: " + colorOpen + dailyStepCount + colorClose;
         currentStepCountTextOutside.text = currentStepCount.ToString();
 
-        totalStepsForNextLevelText.text = "Walk a total of " + colorTagOpen + ReformatIntToText(totalStepsForNextLevel) + colorTagClose + " steps to advance to Level " + colorTagOpen + (playerData.level + 1) + colorTagClose;
+        totalStepsForNextLevelText.text = "Walk a total of " + colorOpen + ReformatIntToText(totalStepsForNextLevel) + colorClose +
+            " steps to advance to Level " + colorOpen + (playerData.level + 1) + colorClose;
 
-        remainingStepsForNextLevelText.text = "Remaining steps for next level: " + colorTagOpen + ReformatIntToText(remainingStepsForNextLevel) + colorTagClose;
-        
-        overallStepCountText.text = "Overall steps: " + colorTagOpen + overallStepCount + colorTagClose;
-       
-        percentageText.text = Mathf.FloorToInt((float)(overallStepCount - CalculateTotalStepsForLevel(playerData.level)) / (totalStepsForNextLevel - CalculateTotalStepsForLevel(playerData.level)) * 100) + "%"; // percentage
+        remainingStepsForNextLevelText.text = "Remaining steps for next level: " + colorOpen + ReformatIntToText(remainingStepsForNextLevel) + colorClose;
+
+        overallStepCountText.text = "Overall steps: " + colorOpen + overallStepCount + colorClose;
+
+        int stepsThisLevel = overallStepCount - CalculateTotalStepsForLevel(playerData.level);
+        int stepsNeeded = totalStepsForNextLevel - CalculateTotalStepsForLevel(playerData.level);
+        float percent = stepsNeeded > 0 ? Mathf.Clamp01((float)stepsThisLevel / stepsNeeded) : 0f;
+        percentageText.text = Mathf.FloorToInt(percent * 100) + "%";
 
         if (userNameText != null && playerData != null)
         {
@@ -145,11 +178,8 @@ public class UserLevel : MonoBehaviour
     {
         try
         {
-            stepCountData = File.ReadAllText(stepJsonFilePath);
-            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
-
-            dailyStepCount = data.dailySteps;
-            overallStepCount = data.overallSteps;
+            dailyStepCount = currentStepData.dailySteps;
+            overallStepCount = currentStepData.overallSteps;
 
             totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
             remainingStepsForNextLevel = totalStepsForNextLevel - overallStepCount;
@@ -157,7 +187,6 @@ public class UserLevel : MonoBehaviour
             while (overallStepCount >= CalculateTotalStepsForLevel(playerData.level + 1))
             {
                 playerData.level++;
-                Debug.Log($"Level Up! New Level: {playerData.level}");
                 playerData.LevelUp();
                 playerData.lastSavedLevel = playerData.level;
                 playerData.SavePlayerData();
@@ -171,14 +200,7 @@ public class UserLevel : MonoBehaviour
 
     public string ReformatIntToText(int number)
     {
-        if (number >= 10000)
-        {
-            return "" + Mathf.Floor(number / 1000) + "K";
-        }
-        else
-        {
-            return number.ToString();
-        }
+        return number >= 10000 ? Mathf.Floor(number / 1000f) + "K" : number.ToString();
     }
 
     void UpdateExperienceBar()

@@ -15,7 +15,7 @@ public class LogOutManager : MonoBehaviour
 
     public async void LogoutAndRestart()
     {
-        Debug.Log("🚪 Starting logout process...");
+        Debug.Log("Starting logout process...");
 
         // 1. Sign out from Unity Services
         if (UnityServices.State != ServicesInitializationState.Initialized)
@@ -25,10 +25,10 @@ public class LogOutManager : MonoBehaviour
 
         if (AuthenticationService.Instance.IsSignedIn)
         {
-            Debug.Log("🔐 Signing out and deleting cloud data...");
+            Debug.Log("Signing out and deleting cloud data...");
             await DeleteAllCloudSaveData();
             AuthenticationService.Instance.SignOut();
-            Debug.Log("✅ Signed out completely.");
+            Debug.Log("Signed out completely.");
         }
 
         // 2. Nuclear data wipe
@@ -44,13 +44,12 @@ public class LogOutManager : MonoBehaviour
             loadingPanel.SetActive(true);
         }
 
-        Debug.Log("💀 Complete data wipe finished. Restarting app...");
+        Debug.Log("Complete data wipe finished. Restarting app...");
         StartCoroutine(QuitAfterDelay(2f));
     }
 
     private void NuclearDataWipe()
     {
-        Debug.Log("💣 NUCLEAR DATA WIPE INITIATED");
 
         // 1. Reset step counters FIRST (before deleting files)
         ResetStepCounters();
@@ -58,7 +57,7 @@ public class LogOutManager : MonoBehaviour
         // 2. Clear ALL PlayerPrefs
         PlayerPrefs.DeleteAll();
         PlayerPrefs.Save();
-        Debug.Log("🗑️ PlayerPrefs nuked");
+        Debug.Log("PlayerPrefs deleted");
 
         // 3. Delete all files
         DeleteAllFiles();
@@ -69,12 +68,12 @@ public class LogOutManager : MonoBehaviour
         // 5. Destroy game objects
         DestroyGameObjects();
 
-        Debug.Log("☢️ NUCLEAR WIPE COMPLETE");
+        Debug.Log("Delete COMPLETE");
     }
 
     private void ResetStepCounters()
     {
-        Debug.Log("🔄 Resetting step counters...");
+        Debug.Log("Resetting step counters...");
 
         try
         {
@@ -90,7 +89,7 @@ public class LogOutManager : MonoBehaviour
                 stepCounter.overallStepsBeforeToday = 0;
                 stepCounter.stepData = null;
 
-                Debug.Log("✅ OverallStepCounter reset");
+                Debug.Log("OverallStepCounter reset");
             }
 
             // Find and reset UserLevel
@@ -102,20 +101,20 @@ public class LogOutManager : MonoBehaviour
                     userLevel.dailyStepCount = 0;
                     userLevel.overallStepCount = 0;
                     userLevel.currentStepCount = 0;
-                    Debug.Log("✅ UserLevel reset");
+                    Debug.Log("UserLevel reset");
                 }
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"⚠️ Error resetting step counters: {e.Message}");
+            Debug.LogWarning($"Error resetting step counters: {e.Message}");
         }
     }
 
     private void DeleteAllFiles()
     {
         string persistentPath = Application.persistentDataPath;
-        Debug.Log($"🎯 Deleting all files in: {persistentPath}");
+        Debug.Log($"Deleting all files in: {persistentPath}");
 
         try
         {
@@ -130,22 +129,22 @@ public class LogOutManager : MonoBehaviour
                     {
                         File.SetAttributes(file, FileAttributes.Normal);
                         File.Delete(file);
-                        Debug.Log($"💀 Deleted: {Path.GetFileName(file)}");
+                        Debug.Log($"Deleted: {Path.GetFileName(file)}");
                     }
                     catch (Exception e)
                     {
-                        Debug.LogWarning($"⚠️ Couldn't delete {Path.GetFileName(file)}: {e.Message}");
+                        Debug.LogWarning($"Couldn't delete {Path.GetFileName(file)}: {e.Message}");
                         
                         // Try overwriting with empty content
                         try
                         {
                             File.WriteAllText(file, "");
                             File.Delete(file);
-                            Debug.Log($"💀 Force deleted: {Path.GetFileName(file)}");
+                            Debug.Log($"Force deleted: {Path.GetFileName(file)}");
                         }
                         catch
                         {
-                            Debug.LogError($"❌ Failed to delete: {Path.GetFileName(file)}");
+                            Debug.LogError($"Failed to delete: {Path.GetFileName(file)}");
                         }
                     }
                 }
@@ -160,20 +159,20 @@ public class LogOutManager : MonoBehaviour
                     }
                     catch (Exception e)
                     {
-                        Debug.LogWarning($"⚠️ Couldn't delete directory: {e.Message}");
+                        Debug.LogWarning($"Couldn't delete directory: {e.Message}");
                     }
                 }
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"❌ Error deleting files: {e.Message}");
+            Debug.LogError($"Error deleting files: {e.Message}");
         }
     }
 
     private void ResetScriptableObjects()
     {
-        Debug.Log("🧹 Resetting ScriptableObjects...");
+        Debug.Log("Resetting ScriptableObjects...");
 
         try
         {
@@ -184,23 +183,23 @@ public class LogOutManager : MonoBehaviour
                 try
                 {
                     inventoryObj.Container.Clear();
-                    Debug.Log($"✅ Cleared: {inventoryObj.name}");
+                    Debug.Log($"Cleared: {inventoryObj.name}");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogWarning($"⚠️ Couldn't clear {inventoryObj.name}: {e.Message}");
+                    Debug.LogWarning($"Couldn't clear {inventoryObj.name}: {e.Message}");
                 }
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"⚠️ Error resetting ScriptableObjects: {e.Message}");
+            Debug.LogWarning($"Error resetting ScriptableObjects: {e.Message}");
         }
     }
 
     private void DestroyGameObjects()
     {
-        Debug.Log("💀 Destroying game objects...");
+        Debug.Log("Destroying game objects...");
 
         try
         {
@@ -217,19 +216,19 @@ public class LogOutManager : MonoBehaviour
                 {
                     try
                     {
-                        Debug.Log($"💀 Destroying: {obj.name}");
+                        Debug.Log($"Destroying: {obj.name}");
                         DestroyImmediate(obj);
                     }
                     catch (System.Exception e)
                     {
-                        Debug.LogWarning($"⚠️ Error destroying {obj.name}: {e.Message}");
+                        Debug.LogWarning($"Error destroying {obj.name}: {e.Message}");
                     }
                 }
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"❌ Error destroying objects: {e.Message}");
+            Debug.LogError($"Error destroying objects: {e.Message}");
         }
     }
 
@@ -244,25 +243,25 @@ public class LogOutManager : MonoBehaviour
                 foreach (var key in keysResult)
                 {
                     await CloudSaveService.Instance.Data.ForceDeleteAsync(key);
-                    Debug.Log($"☁️💀 Cloud key deleted: {key}");
+                    Debug.Log($"Cloud key deleted: {key}");
                 }
-                Debug.Log("☁️ All cloud data deleted");
+                Debug.Log("All cloud data deleted");
             }
             else
             {
-                Debug.Log("☁️ No cloud data to delete");
+                Debug.Log("No cloud data to delete");
             }
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"⚠️ Error deleting cloud data: {e.Message}");
+            Debug.LogWarning($"Error deleting cloud data: {e.Message}");
         }
     }
 
     private IEnumerator QuitAfterDelay(float seconds)
     {
         yield return new WaitForSeconds(seconds);
-        Debug.Log("🔄 Restarting to Entry Screen...");
+        Debug.Log("Restarting to Entry Screen...");
         SceneManager.LoadScene("Entry Screen");
     }
 }

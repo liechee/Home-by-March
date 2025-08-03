@@ -23,104 +23,60 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private async void Awake()
         {
             await UnityServices.InitializeAsync();
+            PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
             SetupEvents();
-
-            // if (AuthenticationService.Instance.IsSignedIn)
-            // {
-            //     Debug.Log("User already signed in.");
-            //     m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-            //     UpdateUI();
-            // }
-            // else
-            // {
-            //     // Still waiting for PlayerAccount event?
-            //     PlayerAccountService.Instance.SignedIn += SignInWithUnity;
-            // }
-            // if (AuthenticationService.Instance.IsAuthorized)
-            // {
-            //     try
-            //     {
-            //         await AuthenticationService.Instance.SignInWithUnityAsync(PlayerAccountService.Instance.AccessToken);
-            //         Debug.Log("Signed in with cached Player Account token.");
-            //         m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-            //         UpdateUI();
-            //     }
-            //     catch (RequestFailedException ex)
-            //     {
-            //         Debug.Log("Could not restore Player Account session.");
-            //         Debug.LogException(ex);
-            //     }
-            // }
-            // else
-            // {
-            //     PlayerAccountService.Instance.SignedIn += SignInWithUnity;
-            //     Debug.Log("Waiting for player to sign in manually.");
-            // }
-            Debug.Log("Initializing Unity Services...");
-
-            if (PlayerAccountService.Instance.IsSignedIn)
+            //UpdateUI();
+            // Check if already signed in on game reopen
+            if (AuthenticationService.Instance.IsSignedIn)
             {
-                Debug.Log("Player Account is signed in.");
-
-                if (!AuthenticationService.Instance.IsSignedIn)
-                {
-                    try
-                    {
-                        await AuthenticationService.Instance.SignInWithUnityAsync(PlayerAccountService.Instance.AccessToken);
-                        Debug.Log("Signed in with Unity Authentication.");
-                    }
-                    catch (RequestFailedException ex)
-                    {
-                        Debug.LogError("Failed to sign in with Unity Auth:");
-                        Debug.LogException(ex);
-                        return;
-                    }
-                }
-
+                Debug.Log("Already signed in. Updating UI.");
                 m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
                 UpdateUI();
             }
             else
             {
-                Debug.Log("Player Account NOT signed in. Waiting for manual sign-in...");
-                PlayerAccountService.Instance.SignedIn += async () =>
-                {
-                    Debug.Log("Player Account SignedIn event triggered.");
-                    try
-                    {
-                        await AuthenticationService.Instance.SignInWithUnityAsync(PlayerAccountService.Instance.AccessToken);
-                        m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-                        UpdateUI();
-                    }
-                    catch (RequestFailedException ex)
-                    {
-                        Debug.LogException(ex);
-                    }
-                };
+                Debug.Log("Not signed in yet. Waiting for PlayerAccountService.");
+                PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
+                UpdateUI();
+            }
+        }
+
+        private void OnPlayerAccountSignedIn()
+        {
+            if (!_isSigningIn && !AuthenticationService.Instance.IsSignedIn)
+            {
+                SignInWithUnity();
             }
         }
 
         public async void StartSignInAsync()
         {
-            if (PlayerAccountService.Instance.IsSignedIn)
-            {
-                Debug.Log("starting sign in with unity");
-                SignInWithUnity();
-                Debug.Log("signed in with unity");
-                return;
-            }
+            if (_isSigningIn) return;
+            _isSigningIn = true;
 
             try
             {
-                await PlayerAccountService.Instance.StartSignInAsync();
-                Debug.Log("skibidi start signin async" + AuthenticationService.Instance.PlayerId);
-                UpdateUI();
-
+                if (!PlayerAccountService.Instance.IsSignedIn)
+                {
+                    await PlayerAccountService.Instance.StartSignInAsync();
+                    Debug.Log("PlayerAccountService signed in.");
+                    // OnPlayerAccountSignedIn will be called by the event
+                }
+                if (PlayerAccountService.Instance.IsSignedIn && !AuthenticationService.Instance.IsSignedIn)
+                {
+                    Debug.Log("Signing in with Unity using access token...");
+                    SignInWithUnity(); // Use access token to authenticate
+                }
             }
             catch (RequestFailedException ex)
             {
                 Debug.LogException(ex);
                 SetException(ex);
+            }
+            finally
+            {
+                _isSigningIn = false;
+                UpdateUI();
             }
         }
 
@@ -141,17 +97,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         async void SignInWithUnity()
         {
-            // try
-            // {
-            //     await AuthenticationService.Instance.SignInWithUnityAsync(PlayerAccountService.Instance.AccessToken);
-            //     m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-            //     UpdateUI();
-            // }
-            // catch (RequestFailedException ex)
-            // {
-            //     Debug.LogException(ex);
-            //     SetException(ex);
-            // }
             if (_isSigningIn || AuthenticationService.Instance.IsSignedIn)
                 return;
 
@@ -159,10 +104,18 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             try
             {
-                await AuthenticationService.Instance.SignInWithUnityAsync(PlayerAccountService.Instance.AccessToken);
-                Debug.Log("Successfully signed in with Unity.");
-                m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-                UpdateUI();
+                var accessToken = PlayerAccountService.Instance.AccessToken;
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    await AuthenticationService.Instance.SignInWithUnityAsync(accessToken);
+                    Debug.Log("Successfully signed in with Unity.");
+                    m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
+                    UpdateUI();
+                }
+                else
+                {
+                    Debug.LogWarning("No access token available for Unity sign-in.");
+                }
             }
             catch (RequestFailedException ex)
             {

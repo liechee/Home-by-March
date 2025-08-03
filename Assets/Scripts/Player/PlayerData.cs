@@ -59,6 +59,30 @@ public class PlayerData : MonoBehaviour
     void Awake()
     {
         playerDataJsonFilePath = Application.persistentDataPath + "/playerData.json";
+        //LoadPlayerData();
+
+        // Initialize lastSavedLevel to the current level if not already set
+        // if (lastSavedLevel == 0)
+        // {
+        //     lastSavedLevel = level;
+        // }
+        // // Load from file as fallback
+        // if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        // {
+        //     Debug.Log("Fresh logout detected. Skipping step data load.");
+        //     Reset();
+        // }
+        // If HasLoggedOut is set, reset all data and skip loading old data
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.Log("Fresh logout detected. Resetting player data.");
+            //Reset();
+            // Don't delete flag here - let other components handle it first
+
+            UpdateCurrentStats();
+            return;
+        }
+
         LoadPlayerData();
 
         // Initialize lastSavedLevel to the current level if not already set
@@ -66,6 +90,7 @@ public class PlayerData : MonoBehaviour
         {
             lastSavedLevel = level;
         }
+
 
         UpdateCurrentStats();
 
@@ -181,7 +206,7 @@ public class PlayerData : MonoBehaviour
     {
 
         await CloudSaver.SaveDataToCloud("playerData", data);
-        
+
     }
 
     public async Task LoadPlayerDataFromCloud()
@@ -236,6 +261,26 @@ public class PlayerData : MonoBehaviour
     {
         playerName = name;
         SavePlayerData();
+    }
+    public void Reset()
+    {
+        // Reset all relevant fields
+        level = 1;
+        health = 100;
+        attack = 10;
+        defense = 5;
+        gold = 0;
+        attackSpeed = 2;
+        movementSpeed = 6;
+
+        // Reset buffs
+        healthBuff = 0;
+        attackBuff = 0;
+        defenseBuff = 0;
+        cooldownBuff = 0;
+        movementSpeedBuff = 0;
+
+        lastSavedLevel = level;
     }
 
 

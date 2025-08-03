@@ -60,6 +60,13 @@ namespace HomeByMarch
 
         private void LoadStepData()
         {
+            // Check if user just logged out - don't load old data
+            if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+            {
+                Debug.Log("Fresh logout detected in StepCountDemo. Starting with fresh data.");
+                ResetStepData();
+                return;
+            }
             if (File.Exists(stepJsonFilePath))
             {
                 string jsonString = File.ReadAllText(stepJsonFilePath);
@@ -80,10 +87,23 @@ namespace HomeByMarch
             }
             else
             {
-                overallStepCount = 0;
-                dailyStepCount = 0;
-                previousDailyStepCount = 0;
+                // overallStepCount = 0;
+                // dailyStepCount = 0;
+                // previousDailyStepCount = 0;
+                ResetStepData();  // Create a new step data file
             }
+        }
+        // Add this method to reset step data completely
+        private void ResetStepData()
+        {
+            overallStepCount = 0;
+            dailyStepCount = 0;
+            previousDailyStepCount = 0;
+
+            // Create fresh data file
+            SaveStepData();
+
+            Debug.Log("StepCountDemo data reset to defaults.");
         }
 
         private void SaveStepData()
@@ -139,7 +159,7 @@ namespace HomeByMarch
         async void RequestPermission()
         {
 #if UNITY_ANDROID
-        AndroidRuntimePermissions.Permission fileManagementResult = await AndroidRuntimePermissions.RequestPermissionAsync("android.permission.MANAGE_EXTERNAL_STORAGE");
+            AndroidRuntimePermissions.Permission fileManagementResult = await AndroidRuntimePermissions.RequestPermissionAsync("android.permission.MANAGE_EXTERNAL_STORAGE");
 #endif
         }
     }

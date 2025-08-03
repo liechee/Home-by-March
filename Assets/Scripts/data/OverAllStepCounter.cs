@@ -21,6 +21,7 @@ public class OverallStepCounter : MonoBehaviour
     public int overallStepsBeforeToday;
     private bool cloudLoaded = false;
     public static event Action onLoaded;
+    private Coroutine refreshStepsCoroutine;
     // //for debug purposes
     // public TMP_Text overallStepsText;
     // public TMP_Text overallStepsBeforeTodayText;
@@ -28,20 +29,29 @@ public class OverallStepCounter : MonoBehaviour
     private static OverallStepCounter instance;
     void Awake()
     {
-        // stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
-
-        // LoadStepData();
+        stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
         if (instance != null && instance != this)
         {
             Destroy(this.gameObject);
             return;
         }
+
         instance = this;
         DontDestroyOnLoad(this.gameObject);
 
-        stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
-        LoadStepData();
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.Log("Fresh logout detected in OverallStepCounter. Resetting step data.");
+            //ResetStepDataCompletely(); // Use a more thorough reset
+            ResetStepDataCompletely(); // Use a more thorough reset
+            // return; // Skip further initialization
+            PlayerPrefs.DeleteKey("HasLoggedOut"); // Clear the flag
+            InitializeStepData(); // Start fresh
+            return;
+        }
 
+
+        LoadStepData();
     }
     void Start()
     {
@@ -49,6 +59,11 @@ public class OverallStepCounter : MonoBehaviour
         {
             GetOverallSteps(); // Delay actual step count until after potential cloud load
         }
+
+        // if (refreshStepsCoroutine == null)
+        // {
+        //     refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
+        // }
     }
 
     // void Update(){
@@ -59,6 +74,8 @@ public class OverallStepCounter : MonoBehaviour
 
     public void GetOverallSteps()
     {
+        Debug.Log("[StepCounter] Running GetOverallSteps...");
+
         if (string.IsNullOrEmpty(stepData.registrationTime) || string.IsNullOrEmpty(stepData.lastSaveTime))
             return;
 
@@ -148,16 +165,19 @@ public class OverallStepCounter : MonoBehaviour
         stepData.numberOfSteps = overallSteps;
         string stepDataJson = JsonUtility.ToJson(stepData);
         File.WriteAllText(stepDataJsonFilePath, stepDataJson);
+        Debug.Log("Step data saved to: " + stepDataJsonFilePath);
     }
 
     public void InitializeStepData()
     {
+        stepData = new StepData(); // Create fresh step data
         StepCounterRequest request = new StepCounterRequest();
         request.Since(DateTime.Today).OnQuerySuccess((stepCount) =>
         {
             overallSteps = stepCount;
             stepData.registrationTime = DateTime.Today.ToString("yyyy-MM-dd");
             stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
+            stepData.numberOfSteps = overallSteps;
             SaveStepData();
         }).Execute();
     }
@@ -183,22 +203,85 @@ public class OverallStepCounter : MonoBehaviour
 
     public async Task LoadStepDataFromCloud()
     {
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.LogWarning("[CloudSync] Skipped loading from cloud — user has logged out.");
+            return;
+        }
         string stepDataJson = await CloudSaver.LoadDataFromCloud("stepData");
         stepData = JsonUtility.FromJson<StepData>(stepDataJson);
 
         Debug.Log($"Cloud step data loaded. Steps: {stepData.numberOfSteps}, Last Save: {stepData.lastSaveTime}, Reg Time: {stepData.registrationTime}");
 
-        SaveStepData(); // Save to local
+        //SaveStepData(); // Save to local
 
         StepCounterRequest request = new StepCounterRequest();
         request.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
         {
             overallSteps = stepData.numberOfSteps + stepCountToday;
-            SaveStepData();
+            overallStepsBeforeToday = stepData.numberOfSteps; // Store past steps
+            //SaveStepData();
 
-            cloudLoaded = true;   // Now cloud data is active
-            GetOverallSteps();    // Run steps again using this cloud base
-            onLoaded?.Invoke();
+            // cloudLoaded = true;   // Now cloud data is active
+            // GetOverallSteps();    // Run steps again using this cloud base
+            // onLoaded?.Invoke();
+            GetOverallSteps();    // Restart counting first
+            cloudLoaded = true;   // Set loaded flag AFTER restarting
+            // if (refreshStepsCoroutine == null)
+            // {
+            //     refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
+            // }
+            onLoaded?.Invoke();   // Notify the rest of the app
         }).Execute();
     }
+    // private IEnumerator RefreshStepsLoop()
+    // {
+    //     while (true)
+    //     {
+    //         GetOverallSteps();
+    //         yield return new WaitForSeconds(10f); // refresh every 10 seconds
+    //     }
+    // }
+    async void OnApplicationQuit()
+    {
+        SaveStepData();
+        await SaveStepDataToCloud();
+    }
+
+    void OnApplicationPause(bool isPaused)
+    {
+        if (isPaused)
+        {
+            SaveStepData();
+        }
+    }
+
+    public void ResetStepDataCompletely()
+    {
+        // Reset all in-memory data
+        stepData = new StepData();
+        overallSteps = 0;
+        overallStepsBeforeToday = 0;
+        cloudLoaded = false;
+
+        // Stop any running coroutines
+        if (refreshStepsCoroutine != null)
+        {
+            StopCoroutine(refreshStepsCoroutine);
+            refreshStepsCoroutine = null;
+        }
+
+        // Delete the file completely
+        if (File.Exists(stepDataJsonFilePath))
+        {
+            File.Delete(stepDataJsonFilePath);
+            Debug.Log("Step data file deleted completely.");
+        }
+
+        // Initialize fresh data
+        InitializeStepData();
+
+        Debug.Log("OverallStepCounter data completely reset.");
+    }
+
 }

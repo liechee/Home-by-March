@@ -35,27 +35,37 @@ public class UserLevel : MonoBehaviour
     private string stepCountData;
     private OverallStepCounter stepCounter;
     private bool cloudStepDataLoaded = false;
-    private StepData currentStepData;
+    private int lastRecordedSteps = 0; // steps at cloud load
+    private int addedSteps = 0; // steps added since then
+    private int lastUIUpdatedStepCount = -1;
+
+    //private StepData currentStepData;
 
     void Awake()
     {
         stepJsonFilePath = Application.persistentDataPath + "/stepData.json";
 
         // Load from file as fallback
-        if (File.Exists(stepJsonFilePath))
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            string json = File.ReadAllText(stepJsonFilePath);
-            currentStepData = JsonUtility.FromJson<StepData>(json);
+            Debug.Log("Fresh logout detected. Skipping step data load.");
+            stepCountData = string.Empty;
+            ResetStepData();
+            // Don't delete the flag yet - let other components handle it
+        }
+        else if (File.Exists(stepJsonFilePath))
+        {
+            stepCountData = File.ReadAllText(stepJsonFilePath);
         }
         else
         {
             Debug.LogWarning("Step data file not found. Creating a new one.");
-            currentStepData = new StepData();
-            File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(currentStepData));
+            StepData fresh = new StepData(); // defaults
+            File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(fresh));
+            stepCountData = JsonUtility.ToJson(fresh);
         }
 
         playerData = FindObjectOfType<PlayerData>();
-        InitializeUserLevelAndSteps();
 
         stepCounter = FindObjectOfType<OverallStepCounter>();
         if (stepCounter != null)
@@ -63,9 +73,19 @@ public class UserLevel : MonoBehaviour
             OverallStepCounter.onLoaded += OnStepDataReadyFromCloud;
         }
 
-        if (stepCounter?.stepData != null && stepCounter.overallSteps > 0)
+        //InitializeUserLevelAndSteps();
+        // Perform first-time init using local file (but only if cloud won't override it)
+        if (stepCounter == null || PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            OnStepDataReadyFromCloud();
+            InitializeUserLevelAndSteps();
+            UpdateText();
+            UpdateExperienceBar();
+        }
+
+        // Only delete the logout flag after all components have handled reset
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            PlayerPrefs.DeleteKey("HasLoggedOut");
         }
     }
 
@@ -81,8 +101,19 @@ public class UserLevel : MonoBehaviour
     {
         Debug.Log("Cloud step data is ready. Refreshing UI...");
 
-        currentStepData = stepCounter.stepData;
+        //currentStepData = stepCounter.stepData;
         cloudStepDataLoaded = true;
+        // Use the in-memory step data from OverallStepCounter
+        // if (stepCounter != null && stepCounter.stepData != null)
+        // {
+        //     dailyStepCount = stepCounter.stepData.dailySteps;
+        //     overallStepCount = stepCounter.overallSteps;
+
+        //     //overallStepCount += dailyStepCount;
+        //     lastRecordedSteps = overallStepCount;
+        //     stepCounter.GetOverallSteps();
+
+        // }
 
         InitializeUserLevelAndSteps();
         UpdateInformation();
@@ -106,8 +137,15 @@ public class UserLevel : MonoBehaviour
 
         try
         {
-            dailyStepCount = currentStepData.dailySteps;
-            overallStepCount = currentStepData.overallSteps;
+            //dailyStepCount = currentStepData.dailySteps;
+            //overallStepCount = currentStepData.overallSteps;
+
+            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
+
+            dailyStepCount = data.dailySteps;
+            overallStepCount = data.overallSteps;
+
+            Debug.Log($"Loaded Step Data - Daily: {dailyStepCount}, Overall: {overallStepCount}");
 
             int totalStepsForCurrentLevel = CalculateTotalStepsForLevel(playerData.level);
             totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
@@ -178,8 +216,20 @@ public class UserLevel : MonoBehaviour
     {
         try
         {
-            dailyStepCount = currentStepData.dailySteps;
-            overallStepCount = currentStepData.overallSteps;
+            // Check if the file exists before reading
+            if (!File.Exists(stepJsonFilePath))
+            {
+                Debug.LogWarning("Step data file not found. Creating a new one.");
+                File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(new StepData()));
+            }
+            stepCountData = File.ReadAllText(stepJsonFilePath);
+            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
+
+            // dailyStepCount = currentStepData.dailySteps;
+            // overallStepCount = currentStepData.overallSteps;
+
+            dailyStepCount = data.dailySteps;
+            overallStepCount = data.overallSteps;
 
             totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
             remainingStepsForNextLevel = totalStepsForNextLevel - overallStepCount;
@@ -214,5 +264,32 @@ public class UserLevel : MonoBehaviour
         {
             experienceBarImage.fillAmount = Mathf.Clamp01(fillAmount);
         }
+    }
+    public void ResetStepData()
+    {
+        // Reset in-memory values
+        dailyStepCount = 0;
+        overallStepCount = 0;
+        remainingStepsForNextLevel = 0;
+        currentStepCount = 0;
+        totalStepsForNextLevel = CalculateTotalStepsForLevel(2); // Assuming level 1 is the start
+
+        // Reset the file on disk - ensure it's completely fresh
+        StepData fresh = new StepData(); // defaults
+        string freshJson = JsonUtility.ToJson(fresh);
+        File.WriteAllText(stepJsonFilePath, freshJson);
+        stepCountData = freshJson;
+
+        // Force clear any cached data
+        cloudStepDataLoaded = false;
+        lastRecordedSteps = 0;
+        addedSteps = 0;
+        lastUIUpdatedStepCount = -1;
+
+        // Optionally update UI
+        UpdateText();
+        UpdateExperienceBar();
+
+        Debug.Log("Step data has been completely reset and cleared from memory.");
     }
 }

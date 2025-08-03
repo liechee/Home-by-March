@@ -30,7 +30,11 @@ public static class PlayerPrefsCloudSync
         "DungeonComplete_2",
         "PlayerGold",
         "PlayerLevel",
-        "ItemClaimed"
+        "ItemClaimed",
+        "StoryCompleted_0",
+        "StoryCompleted_1",
+        "StoryCompleted_2",
+        "StoryCompleted_3",
         // Add any other PlayerPrefs keys you want to persist
     };
 

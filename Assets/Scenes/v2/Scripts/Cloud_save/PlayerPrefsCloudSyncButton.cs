@@ -15,14 +15,14 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
 
     void Awake()
     {
-        if (instance != null && instance != this)
-        {
-            Destroy(this.gameObject);
-            return;
-        }
-        instance = this;
+        // if (instance != null && instance != this)
+        // {
+        //     Destroy(this.gameObject);
+        //     return;
+        // }
+        // instance = this;
 
-        DontDestroyOnLoad(this.gameObject);
+        // DontDestroyOnLoad(this.gameObject);
         overallStepCounter = FindObjectOfType<OverallStepCounter>();
         if (overallStepCounter == null) Debug.LogWarning("OverallStepCounter not found!");
 
@@ -81,6 +81,7 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         if (inventory != null)
         {
             await inventory.SaveInventoryToCloud("inventory_save.json");
+            await inventory.SaveInventoryToCloud("New Inventory");
             Debug.Log("[CloudSync] Inventory saved to cloud.");
         }
         Debug.Log("[CloudSync] SaveToCloud complete.");
@@ -88,6 +89,11 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
 
     public async void LoadFromCloud()
     {
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.LogWarning("[CloudSync] Skipping cloud load — logout flag set.");
+            return;
+        }
         // await PlayerPrefsCloudSync.LoadAllFromCloud();
         // await overallStepCounter.LoadStepDataFromCloud();
         // //overallStepCounter = FindObjectOfType<OverallStepCounter>();
@@ -103,6 +109,7 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         {
             await overallStepCounter.LoadStepDataFromCloud();
             Debug.Log("[CloudSync] Step data loaded from cloud.");
+            ForceStepRefresh(); // Force refresh after loading
         }
         if (playerData != null)
         {
@@ -127,10 +134,19 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         if (inventory != null)
         {
             await inventory.LoadInventoryFromCloud("inventory_save.json");
+            await inventory.LoadInventoryFromCloud("New Inventory");
             Debug.Log("[CloudSync] Inventory loaded from cloud.");
         }
         Debug.Log("[CloudSync] LoadFromCloud complete.");
 
+    }
+    public void ForceStepRefresh()
+    {
+        if (overallStepCounter != null)
+        {
+            Debug.Log("[Manual Trigger] Forcing step refresh...");
+            overallStepCounter.GetOverallSteps();
+        }
     }
 
 }

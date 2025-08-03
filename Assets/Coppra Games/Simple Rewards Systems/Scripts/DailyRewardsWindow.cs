@@ -52,7 +52,15 @@ namespace CoppraGames
         {
             dailyQuestJsonFilePath = Application.persistentDataPath + "/playerDailyQuestData.json";
 
-            if (System.IO.File.Exists(dailyQuestJsonFilePath))
+            // Check for logout flag and reset if needed
+            if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+            {
+                Debug.Log("Fresh logout detected in DailyRewardsWindow. Resetting daily quest data.");
+                dailyQuestProgress = new DailyQuestProgress(rewards.Length);
+                currentDailySteps = 0;
+                SaveDailyQuestData(); // Save the reset data
+            }
+            else if (System.IO.File.Exists(dailyQuestJsonFilePath))
             {
                 LoadDailyQuestData();
             }
@@ -60,6 +68,7 @@ namespace CoppraGames
             {
                 dailyQuestProgress = new DailyQuestProgress(rewards.Length);
             }
+            
             if (!IsYesterdayRewardCollected() | GetDaysSinceLastReset() >= 7)
             {
                 ResetDailyRewards();

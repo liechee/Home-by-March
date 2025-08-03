@@ -20,7 +20,7 @@ public class videoCutscene : MonoBehaviour
         {
             // First time running the scene
             Debug.Log("Running the scene for the first time.");
-            
+
             // Start the cutscene
             videoPlayer.Play();
             videoPlayer.loopPointReached += EndReached; // Subscribe to the event when video ends
@@ -32,6 +32,16 @@ public class videoCutscene : MonoBehaviour
             stopCutscene();
             LoadNextScene();
         }
+    }
+    public void SkipCutscene()
+    {
+        // Set PlayerPrefs to mark that the scene has been run
+        PlayerPrefs.SetInt("Cutscene PH", 1);
+        PlayerPrefs.Save();  // Save PlayerPrefs to ensure it persists
+
+        Debug.Log("Cutscene skipped by user.");
+        stopCutscene();
+        LoadNextScene();
     }
 
     void EndReached(VideoPlayer vp)

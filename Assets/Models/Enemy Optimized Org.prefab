@@ -181,6 +181,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1429583177773880984, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4134261181843849412, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -360,6 +364,18 @@ PrefabInstance:
     - target: {fileID: 7710292249566864328, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
       propertyPath: skinnedMeshRenderer
       value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 8031799274853100699, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8031799274853100699, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8031799274853100699, guid: 1203b23744bab0a4ea94cc07b42216e0, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:

@@ -15,17 +15,19 @@ public class OneTimeSceneAccess : MonoBehaviour
     public void OnSceneChangeButtonClick()
     {
         Debug.Log("Button clicked");
-        
+
         // Check if player data exists in playerData.json
         if (PlayerDataExists())
         {
             // Player data exists, change scene to Main
             SceneManager.LoadScene("Main Screen");
+            Debug.Log("[OneTimeSceneAccess] PlayerData file exists");
         }
         else
         {
             // Player data doesn't exist, change scene to LogIn
             SceneManager.LoadScene("LogIn Screen");
+            Debug.Log("[OneTimeSceneAccess] PlayerData does not exists");
         }
     }
 

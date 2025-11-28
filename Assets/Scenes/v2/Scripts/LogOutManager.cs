@@ -46,8 +46,6 @@ public class LogOutManager : MonoBehaviour
 
         // 4. Set logout flag
         PlayerPrefs.SetInt("HasLoggedOut", 1);
-        // Prevent cloud or local restore of previous step data until user signs in again
-        PlayerPrefs.SetInt("SuppressCloudRestore", 1);
         PlayerPrefs.Save();
 
         // 5. UI + Restart

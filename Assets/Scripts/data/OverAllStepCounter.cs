@@ -47,14 +47,16 @@ public class OverallStepCounter : MonoBehaviour
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
             Debug.Log("Fresh logout detected in OverallStepCounter. Resetting step data.");
-            ResetStepDataCompletely(); // reset in-memory and delete file
 
-            // Keep the HasLoggedOut flag for other systems to observe; do NOT delete it here.
-            // Suppress immediate device queries while in the logged-out display state
+            ResetStepDataCompletely(); //reset
+            PlayerPrefs.DeleteKey("HasLoggedOut"); // Clear the flag
+
+            //InitializeStepData(); // Start fresh
+            // Set flag to suppress step query and show 0
             PlayerPrefs.SetInt("SuppressStepQuery", 1);
             PlayerPrefs.Save();
 
-            InitializeStepDataAfterLogout(); // Use special initialization (in-memory baseline only)
+            InitializeStepDataAfterLogout(); // Use special initialization
             return;
         }
 
@@ -371,15 +373,16 @@ public class OverallStepCounter : MonoBehaviour
         StepCounterRequest request = new StepCounterRequest();
         request.Since(DateTime.Today).OnQuerySuccess((currentDeviceSteps) =>
         {
-            // Keep baseline in-memory ONLY. Do NOT persist baseline to disk while logged out,
-            // otherwise the app may later restore previous counts unexpectedly.
-            stepData.baselineSteps = currentDeviceSteps; // in-memory only
+            stepData.baselineSteps = currentDeviceSteps; // Store as baseline for first day only
             baselineEstablished = true;
 
-            Debug.Log($"[LOGOUT INIT] In-memory baseline established: {currentDeviceSteps} device steps for logout day only (not saved to disk)");
+            string stepDataJson = JsonUtility.ToJson(stepData);
+            File.WriteAllText(stepDataJsonFilePath, stepDataJson);
 
-            // Start real-time step counting after baseline is set if queries aren't suppressed
-            if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            Debug.Log($"[LOGOUT INIT] Baseline established: {currentDeviceSteps} device steps for logout day only");
+            Debug.Log($"[LOGOUT INIT] Saved stepData with baseline: {stepDataJson}");
+            // Start real-time step counting after baseline is set
+            if (refreshStepsCoroutine == null)
             {
                 refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
                 Debug.Log("[LOGOUT INIT] Started refresh coroutine for real-time counting");
@@ -393,29 +396,7 @@ public class OverallStepCounter : MonoBehaviour
         {
             string stepDataJson = File.ReadAllText(stepDataJsonFilePath);
             stepData = JsonUtility.FromJson<StepData>(stepDataJson);
-            Debug.Log($"[PERSISTENCE] Local step data loaded: {stepDataJson}");
-
-            if (stepData == null)
-            {
-                Debug.LogWarning("Loaded stepData was null - creating new StepData instance.");
-                stepData = new StepData();
-            }
-
-            // Restore in-memory values from saved data so UI and consumers see the correct counts
-            overallSteps = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
-            overallStepsBeforeToday = stepData.numberOfSteps;
-            baselineEstablished = (stepData.baselineSteps > 0);
-
-            Debug.Log($"[PERSISTENCE] Restored overallSteps={overallSteps}, dailySteps={stepData.dailySteps}, baseline={stepData.baselineSteps}");
-
-            // Notify listeners immediately with the restored values
-            onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
-
-            // Ensure the refresh coroutine runs unless step queries are suppressed (e.g. immediately after logout)
-            if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
-            {
-                refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
-            }
+            Debug.Log("Local step data loaded.");
         }
         else
         {
@@ -430,10 +411,9 @@ public class OverallStepCounter : MonoBehaviour
 
     public async Task LoadStepDataFromCloud()
     {
-        // Respect an explicit suppression set by logout flow to avoid restoring previous counts
-        if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            Debug.LogWarning("[CloudSync] Skipped loading from cloud — cloud restore suppressed after logout.");
+            Debug.LogWarning("[CloudSync] Skipped loading from cloud — user has logged out.");
             return;
         }
 

@@ -9,73 +9,66 @@ public class RewardChecker : MonoBehaviour
 {
     public Button unlockButton;
     public TMP_Text buttonText;
-    public TMP_Text progressText; // New text field to show step progress
+    public TMP_Text progressText;
     public int requiredSteps;
 
     private int overallSteps;
-    private string stepJsonFilePath;
-    private string stepCountData;
+    private OverallStepCounter stepCounter;
 
     void Awake()
     {
-        stepJsonFilePath = Application.persistentDataPath + "/stepData.json";
-
-        // Check if the step data file exists before trying to read it
-        if (File.Exists(stepJsonFilePath))
+        stepCounter = FindObjectOfType<OverallStepCounter>();
+        
+        if (stepCounter != null)
         {
-            stepCountData = File.ReadAllText(stepJsonFilePath);
-            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
-            overallSteps = data.overallSteps;
+            // Subscribe to step update events
+            OverallStepCounter.onStepsUpdated += OnStepsUpdated;
+            
+            // Get initial value
+            overallSteps = stepCounter.overallSteps;
+            
+            Debug.Log($"RewardChecker: Got {overallSteps} steps from OverallStepCounter, subscribed to events");
         }
         else
         {
-            Debug.LogWarning("Step data file not found. Creating a new file with default data.");
-            File.WriteAllText(stepJsonFilePath, JsonUtility.ToJson(new StepData()));
+            Debug.LogWarning("OverallStepCounter not found! Defaulting to 0 steps.");
             overallSteps = 0;
         }
 
         UpdateButtonState();
     }
 
-    void Update()
+    void OnDestroy()
     {
-        // Continuously update the overallSteps and button state
-        UpdateStepData();
-        UpdateButtonState();
+        // IMPORTANT: Unsubscribe from events to prevent memory leaks
+        if (stepCounter != null)
+        {
+            OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        }
     }
-    private void UpdateStepData()
+
+    // Event handler - called when OverallStepCounter finishes calculating steps
+    void OnStepsUpdated(int newOverallSteps, int newDailySteps)
     {
-        // Re-read the step data file to get the latest steps
-        if (File.Exists(stepJsonFilePath))
-        {
-            stepCountData = File.ReadAllText(stepJsonFilePath);
-            StepData data = JsonUtility.FromJson<StepData>(stepCountData);
-            overallSteps = data.overallSteps; // Update the overallSteps dynamically
-        }
-        else
-        {
-            Debug.LogWarning("Step data file not found during update.");
-        }
+        overallSteps = newOverallSteps;
+        UpdateButtonState();
+        Debug.Log($"RewardChecker: Steps updated via event to {overallSteps}");
     }
 
     private void UpdateButtonState()
     {
-        string colorTagOpen = "<color=#FFEE00>"; // red
+        string colorTagOpen = "<color=#FFEE00>";
         string colorTagClose = "</color>";
+        
         if (overallSteps >= requiredSteps)
         {
-            // Make the button interactable if the steps are sufficient
             unlockButton.interactable = true;
-
         }
         else
         {
-            // Keep the button non-interactable if the steps are insufficient
             unlockButton.interactable = false;
-            // buttonText.text = $"Need {requiredSteps - overallSteps} more steps";
         }
 
-        // Update the progress text to show overall steps and required steps
         progressText.text = $"{colorTagOpen}{overallSteps}{colorTagClose}/{requiredSteps}";
     }
 
@@ -83,10 +76,12 @@ public class RewardChecker : MonoBehaviour
     {
         if (unlockButton.interactable)
         {
-            Debug.Log("Unlock button clicked!");
+            Debug.Log($"Unlock button clicked! Steps: {overallSteps} >= Required: {requiredSteps}");
             // Add your unlock logic here
         }
+        else
+        {
+            Debug.Log($"Unlock button clicked but not enough steps! Steps: {overallSteps} < Required: {requiredSteps}");
+        }
     }
-
-
 }

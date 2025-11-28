@@ -7,22 +7,32 @@ using System.IO;
 using System.Threading.Tasks;
 using Unity.Services.CloudSave;
 using System;
+using UnityEngine.InputSystem;
+using Unity.VisualScripting;
+using Repforge.StepCounterPro;
 
 public class LogOutManager : MonoBehaviour
 {
     [Header("UI")]
     [SerializeField] private GameObject loadingPanel;
+    private OverallStepCounter stepCounter;
+    private const string DailyStepOffsetKey = "DailyStepOffset";
+    private const string OverallStepOffsetKey = "OverallStepOffset";
+
 
     public async void LogoutAndRestart()
     {
         Debug.Log("Starting logout process...");
 
-        // 1. Sign out from Unity Services
         if (UnityServices.State != ServicesInitializationState.Initialized)
         {
             await UnityServices.InitializeAsync();
         }
 
+        // 1. Save offsets BEFORE destroying data
+        SaveStepOffsets(); // 🟩 Moved to top
+
+        // 2. Sign out and delete cloud
         if (AuthenticationService.Instance.IsSignedIn)
         {
             Debug.Log("Signing out and deleting cloud data...");
@@ -31,22 +41,21 @@ public class LogOutManager : MonoBehaviour
             Debug.Log("Signed out completely.");
         }
 
-        // 2. Nuclear data wipe
+        // 3. Nuclear wipe
         NuclearDataWipe();
 
-        // 3. Set logout flag
+        // 4. Set logout flag
         PlayerPrefs.SetInt("HasLoggedOut", 1);
+        // Prevent cloud or local restore of previous step data until user signs in again
+        PlayerPrefs.SetInt("SuppressCloudRestore", 1);
         PlayerPrefs.Save();
 
-        // 4. Show loading and restart
-        if (loadingPanel != null)
-        {
-            loadingPanel.SetActive(true);
-        }
-
+        // 5. UI + Restart
+        if (loadingPanel != null) loadingPanel.SetActive(true);
         Debug.Log("Complete data wipe finished. Restarting app...");
         StartCoroutine(QuitAfterDelay(2f));
     }
+
 
     private void NuclearDataWipe()
     {
@@ -122,7 +131,7 @@ public class LogOutManager : MonoBehaviour
             {
                 // Get all files
                 string[] allFiles = Directory.GetFiles(persistentPath, "*.*", SearchOption.AllDirectories);
-                
+
                 foreach (string file in allFiles)
                 {
                     try
@@ -134,7 +143,7 @@ public class LogOutManager : MonoBehaviour
                     catch (Exception e)
                     {
                         Debug.LogWarning($"Couldn't delete {Path.GetFileName(file)}: {e.Message}");
-                        
+
                         // Try overwriting with empty content
                         try
                         {
@@ -205,13 +214,13 @@ public class LogOutManager : MonoBehaviour
         {
             GameObject thisGameObject = this.gameObject;
             GameObject[] allObjects = FindObjectsOfType<GameObject>();
-            
+
             foreach (GameObject obj in allObjects)
             {
                 if (obj == null || obj == thisGameObject) continue;
-                
-                if (obj.scene.name == "DontDestroyOnLoad" && 
-                    !obj.name.Contains("EventSystem") && 
+
+                if (obj.scene.name == "DontDestroyOnLoad" &&
+                    !obj.name.Contains("EventSystem") &&
                     !obj.name.Contains("AudioListener"))
                 {
                     try
@@ -237,7 +246,7 @@ public class LogOutManager : MonoBehaviour
         try
         {
             var keysResult = await CloudSaveService.Instance.Data.RetrieveAllKeysAsync();
-            
+
             if (keysResult.Count > 0)
             {
                 foreach (var key in keysResult)
@@ -264,4 +273,20 @@ public class LogOutManager : MonoBehaviour
         Debug.Log("Restarting to Entry Screen...");
         SceneManager.LoadScene("Entry Screen");
     }
+    void SaveStepOffsets()
+    {
+        StepCounterRequest dailyRequest = new StepCounterRequest();
+        dailyRequest.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
+        {
+            PlayerPrefs.SetInt(DailyStepOffsetKey, stepCountToday);
+        }).Execute();
+
+        StepCounterRequest totalRequest = new StepCounterRequest();
+        totalRequest.Since(DateTime.Today.AddDays(-10)).OnQuerySuccess((stepCountTotal) =>
+        {
+            PlayerPrefs.SetInt(OverallStepOffsetKey, stepCountTotal);
+            PlayerPrefs.Save();
+        }).Execute();
+    }
+
 }

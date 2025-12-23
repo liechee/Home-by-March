@@ -76,9 +76,10 @@ public class PlayerData : MonoBehaviour
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
             Debug.Log("Fresh logout detected. Resetting player data.");
-            //Reset();
-            // Don't delete flag here - let other components handle it first
-
+            // Reset player data to safe defaults so UI shows Level 1 after logout
+            Reset();
+            // Persist the reset player data locally so startup state is consistent
+            SavePlayerData();
             UpdateCurrentStats();
             return;
         }

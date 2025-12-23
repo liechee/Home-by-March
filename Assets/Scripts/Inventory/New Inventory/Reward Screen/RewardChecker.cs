@@ -23,11 +23,12 @@ public class RewardChecker : MonoBehaviour
         {
             // Subscribe to step update events
             OverallStepCounter.onStepsUpdated += OnStepsUpdated;
-            
-            // Get initial value
+            OverallStepCounter.onLoaded += OnStepDataLoaded;
+
+            // Get initial value (may be 0 until OverallStepCounter finishes loading)
             overallSteps = stepCounter.overallSteps;
-            
-            Debug.Log($"RewardChecker: Got {overallSteps} steps from OverallStepCounter, subscribed to events");
+
+            Debug.Log($"RewardChecker: Initialized with {overallSteps} steps from OverallStepCounter, subscribed to events");
         }
         else
         {
@@ -44,6 +45,7 @@ public class RewardChecker : MonoBehaviour
         if (stepCounter != null)
         {
             OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+            OverallStepCounter.onLoaded -= OnStepDataLoaded;
         }
     }
 
@@ -53,6 +55,17 @@ public class RewardChecker : MonoBehaviour
         overallSteps = newOverallSteps;
         UpdateButtonState();
         Debug.Log($"RewardChecker: Steps updated via event to {overallSteps}");
+    }
+
+    void OnStepDataLoaded()
+    {
+        // Ensure we read the processed values after cloud/local load
+        if (stepCounter != null)
+        {
+            overallSteps = stepCounter.overallSteps;
+            UpdateButtonState();
+            Debug.Log($"RewardChecker: Step data loaded - overallSteps set to {overallSteps}");
+        }
     }
 
     private void UpdateButtonState()

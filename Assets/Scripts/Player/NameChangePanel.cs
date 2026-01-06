@@ -13,13 +13,14 @@ public class NameChangePanel : MonoBehaviour
         inputField.text = playerData.playerName;
     }
 
-    public void changeName(){
+    public void ChangeName(){
 
         if (inputField.text.Length <= 20){
-        playerData.playerName = inputField.GetComponent<TMP_InputField>().text;
-        playerData.SavePlayerData();
+            playerData.ChangePlayerName(inputField.text);
+            Debug.Log($"Player name changed to: {inputField.text}");
+            playerData.SavePlayerData();
         } else {
-            inputField.GetComponent<TMP_InputField>().text = "Name too long!";
+            inputField.text = "Name too long!";
         }
     }
 }

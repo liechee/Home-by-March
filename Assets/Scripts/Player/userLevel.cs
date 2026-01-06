@@ -143,7 +143,10 @@ public class UserLevel : MonoBehaviour
 
             // Recalculate level-related values
             totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
+            int totalStepsForCurrentLevel = CalculateTotalStepsForLevel(playerData.level);
             remainingStepsForNextLevel = totalStepsForNextLevel - overallStepCount;
+
+            Debug.Log($"[STEPS UPDATE] Overall: {overallStepCount}, Daily: {dailyStepCount}, Level: {playerData.level}, Remaining: {remainingStepsForNextLevel}");
 
             // Check for level ups
             while (overallStepCount >= CalculateTotalStepsForLevel(playerData.level + 1))
@@ -152,6 +155,9 @@ public class UserLevel : MonoBehaviour
                 playerData.LevelUp();
                 playerData.lastSavedLevel = playerData.level;
                 playerData.SavePlayerData();
+                totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
+                remainingStepsForNextLevel = totalStepsForNextLevel - overallStepCount;
+                Debug.Log($"[LEVEL UP] New level: {playerData.level}, Total steps for next: {totalStepsForNextLevel}");
             }
 
             // Update UI only once after all calculations
@@ -363,7 +369,7 @@ public class UserLevel : MonoBehaviour
         int stepsThisLevel = overallStepCount - CalculateTotalStepsForLevel(playerData.level);
         int stepsNeeded = totalStepsForNextLevel - CalculateTotalStepsForLevel(playerData.level);
         float percent = stepsNeeded > 0 ? Mathf.Clamp01((float)stepsThisLevel / stepsNeeded) : 0f;
-        percentageText.text = Mathf.FloorToInt(percent * 100) + "%";
+        percentageText.text = Mathf.RoundToInt(percent * 100) + "%";
 
         if (userNameText != null && playerData != null)
         {
@@ -482,13 +488,15 @@ public class UserLevel : MonoBehaviour
     void UpdateExperienceBar()
     {
         int totalStepsForPreviousLevel = CalculateTotalStepsForLevel(playerData.level);
-        int differenceInSteps = totalStepsForNextLevel - totalStepsForPreviousLevel;
+        int stepsThisLevel = overallStepCount - totalStepsForPreviousLevel;
+        int stepsNeeded = totalStepsForNextLevel - totalStepsForPreviousLevel;
 
-        float fillAmount = (float)(differenceInSteps - remainingStepsForNextLevel) / differenceInSteps;
+        float fillAmount = stepsNeeded > 0 ? Mathf.Clamp01((float)stepsThisLevel / stepsNeeded) : 0f;
 
         if (experienceBarImage != null)
         {
-            experienceBarImage.fillAmount = Mathf.Clamp01(fillAmount);
+            experienceBarImage.fillAmount = fillAmount;
+            Debug.Log($"[EXP BAR] Updated - Level: {playerData.level}, StepsThisLevel: {stepsThisLevel}, StepsNeeded: {stepsNeeded}, Fill: {fillAmount:F2}");
         }
     }
     public void ResetStepData()

@@ -5,7 +5,6 @@ using Unity.Services.Core;
 using Unity.Services.Authentication;
 using System.Threading.Tasks;
 using System;
-using UnityEngine;
 
 public class Authenticator : MonoBehaviour
 {

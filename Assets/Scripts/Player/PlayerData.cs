@@ -59,6 +59,7 @@ public class PlayerData : MonoBehaviour
     void Awake()
     {
         playerDataJsonFilePath = Application.persistentDataPath + "/playerData.json";
+        Debug.Log($"[PlayerData] Awake called - Initial playerName from constructor: '{playerName}'");
         //LoadPlayerData();
 
         // Initialize lastSavedLevel to the current level if not already set
@@ -72,19 +73,25 @@ public class PlayerData : MonoBehaviour
         //     Debug.Log("Fresh logout detected. Skipping step data load.");
         //     Reset();
         // }
-        // If HasLoggedOut is set, reset all data and skip loading old data
+        
+        // First, ALWAYS load saved player data (to preserve player name and other persistent stats)
+        LoadPlayerData();
+        Debug.Log($"[PlayerData] After LoadPlayerData - playerName: '{playerName}'");
+
+        // If HasLoggedOut is set, reset gameplay stats but PRESERVE the player name
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            Debug.Log("Fresh logout detected. Resetting player data.");
+            Debug.Log("Fresh logout detected. Resetting gameplay stats but preserving player name.");
+            string savedName = playerName; // Preserve the loaded name
             // Reset player data to safe defaults so UI shows Level 1 after logout
             Reset();
+            playerName = savedName; // Restore the player name
+            Debug.Log($"[PlayerData] After Reset, restored playerName to: '{playerName}'");
             // Persist the reset player data locally so startup state is consistent
             SavePlayerData();
             UpdateCurrentStats();
             return;
         }
-
-        LoadPlayerData();
 
         // Initialize lastSavedLevel to the current level if not already set
         if (lastSavedLevel == 0)
@@ -181,7 +188,8 @@ public class PlayerData : MonoBehaviour
         string playerDataJson = JsonUtility.ToJson(data);
         System.IO.File.WriteAllText(playerDataJsonFilePath, playerDataJson);
 
-        // Debug.Log("Saved Player Data" + data.playerName);
+        Debug.Log($"[PlayerData] Saved player data: Name='{data.playerName}', Level={data.level}, Gold={data.gold}");
+        Debug.Log($"[PlayerData] Saved to: {playerDataJsonFilePath}");
 
 
     }
@@ -189,14 +197,20 @@ public class PlayerData : MonoBehaviour
     public void LoadPlayerData()
     {
 
+
+
+ 
         if (System.IO.File.Exists(playerDataJsonFilePath))
         {
             string playerDataJson = System.IO.File.ReadAllText(playerDataJsonFilePath);
             data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
 
+            Debug.Log($"[PlayerData] Raw JSON loaded: {playerDataJson}");
+            Debug.Log($"[PlayerData] Parsed name: '{data.playerName}', level: {data.level}");
+
             SetPlayerStats(data);
 
-            Debug.Log("Player Data Loaded");
+            Debug.Log($"[PlayerData] Player data loaded - Name: '{playerName}', Level: {level}");
 
 
         }
@@ -255,13 +269,15 @@ public class PlayerData : MonoBehaviour
         attackSpeed = playerData.attackSpeed;
         UpdateCurrentStats();
 
-        Debug.Log("player stats set!");
+        Debug.Log($"[PlayerData] SetPlayerStats called - Name set to: '{playerName}', Level: {level}");
     }
 
     public void ChangePlayerName(string name)
     {
+        Debug.Log($"[PlayerData] ChangePlayerName called - Old name: '{playerName}', New name: '{name}'");
         playerName = name;
         SavePlayerData();
+        Debug.Log($"[PlayerData] Name changed and saved. Current playerName field: '{playerName}'");
     }
     public void Reset()
     {

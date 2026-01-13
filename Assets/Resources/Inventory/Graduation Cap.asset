@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Graduation Cap
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: bd6864ed85cf3bc42bddcf9506c05ec1, type: 3}
+  characterDisplay: {fileID: 2856896212083099828, guid: 332f6c81fb09c4541bb490d82d476960, type: 3}
+  stackable: 1
+  type: 1
+  description: Stitched together with threads of ambition and perseverance, the Graduation
+    Cap represents the culmination of dreams and hard-earned triumphs. Its tassel,
+    said to carry the blessings of mentors past, sways with the rhythm of new beginnings.
+    Those who don it often feel a surge of hope, as though the weight of possibility
+    rests lightly on their shoulders.
+  data:
+    Name: 
+    Id: 10
+    buffs:
+    - attribute: 1
+      value: 5
+      min: 0
+      max: 0
+    - attribute: 3
+      value: -2
+      min: 0
+      max: 0
+  skillData: {fileID: 0}
+  boneNames: []

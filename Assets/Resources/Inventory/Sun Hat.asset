@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Sun Hat
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: f02299e7859b9614e8afd82c80cc0e19, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: 7a7c4aef94f67e94e849aba193e6ba2b, type: 3}
+  stackable: 0
+  type: 1
+  description: "Woven from the golden threads of sun-kissed fields, the Sun Hat is
+    said to hold the warmth of endless summer days. Stories tell of its calming presence,
+    shielding its wearer not just from the sun\u2019s rays but also from the storms
+    of the heart. Beneath its wide brim, one finds serenity and the courage to grow,
+    as though it whispers the song of blooming meadows and gentle breezes."
+  data:
+    Name: Sun Hat White
+    Id: 41
+    buffs:
+    - attribute: 2
+      value: 18
+      min: 0
+      max: 0
+  skillData: {fileID: 11400000, guid: 01d9845290445f741aa61c0888f92b13, type: 2}
+  boneNames: []

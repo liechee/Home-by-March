@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c3ced775e126c04f85a9f1cceae9f1d, type: 3}
+  m_Name: Let Me Stay Here
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: cfae5a51ad8951f44b4dcbd231e6e270, type: 3}
+  spellName: Let Me Stay Here
+  description: A geographer once said that flowers are ephemeral, but you don't have
+    to be. +3DEF. Now go bloom, sapling.
+  shieldPrefab: {fileID: 5966243932138495114, guid: 622ee0ebec7891b45867bf3755309cf1, type: 3}
+  duration: 10
+  defense: 3
+  soundref: 4

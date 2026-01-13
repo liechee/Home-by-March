@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: CatEars
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 09258b5db62a68d4a9b9e8aa77021e1c, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: 9371f340743b52d408f84411ee53ed1d, type: 3}
+  stackable: 0
+  type: 1
+  description: Fashioned by a whimsical artisan inspired by the mysterious grace
+    of feline companions, these enchanted Cat Ears are said to amplify their wearer's
+    curiosity and agility. Whispers tell of their soft glow under the moonlight,
+    as if channeling the watchful gaze of a thousand nocturnal hunters. Those who
+    wear them often feel an uncanny connection to the shadows, moving with quiet
+    confidence and a playful spirit.
+  data:
+    Name: CatEars
+    Id: 39
+    buffs:
+    - attribute: 1
+      value: 2
+      min: 0
+      max: 0
+  skillData: {fileID: 11400000, guid: 2018ce08e97c54d4a80ca5aee7616e81, type: 2}
+  boneNames: []

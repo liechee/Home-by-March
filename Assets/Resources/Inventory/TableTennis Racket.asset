@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: TableTennis Racket
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 089b3c67880c7334a9b1778ac14ccbb2, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: f4b5036e06a9cb244af6c434cad9e2b8, type: 3}
+  stackable: 0
+  type: 2
+  description: Crafted by a spirited competitor, this Table Tennis Racket hums with
+    the rhythm of swift exchanges. Its surface seems to glow faintly when matched
+    against a worthy opponent. Tales speak of it amplifying focus and agility, its
+    every strike echoing with the thrill of competition and camaraderie.
+  data:
+    Name: 
+    Id: 37
+    buffs:
+    - attribute: 3
+      value: 23
+      min: 0
+      max: 0
+  skillData: {fileID: 0}
+  boneNames: []

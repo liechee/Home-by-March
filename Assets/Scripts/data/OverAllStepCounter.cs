@@ -23,9 +23,11 @@ public class OverallStepCounter : MonoBehaviour
     public static event Action onLoaded;
     private Coroutine refreshStepsCoroutine;
     [Tooltip("Polling interval (seconds) used to refresh step counts. Lower = more responsive, higher = less battery usage.")]
-    public float refreshInterval = 2f;
+    public float refreshInterval = 0.5f;  // Default 0.5s for real-time feel
     [Tooltip("Enable verbose logging for step query results (for debugging only)")]
     public bool debugStepQueries = false;
+    [Tooltip("Minimum step change threshold before firing update event. Prevents jitter from device noise.")]
+    public int stepChangeThreshold = 5;  // Only update UI if change >= 5 steps
     private const string OverallStepOffsetKey = "OverallStepOffset";
     private const string DailyStepOffsetKey = "DailyStepOffset";
     public static event Action<int, int> onStepsUpdated; // overall, daily
@@ -36,9 +38,12 @@ public class OverallStepCounter : MonoBehaviour
     // public TMP_Text overallStepsBeforeTodayText;
 
     private static OverallStepCounter instance;
+    private bool waitingForCloudData = false;  // Flag to suppress local events if cloud load pending
+    
     void Awake()
     {
         stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
+        Debug.Log($"[INIT] OverallStepCounter.Awake() - stepDataJsonFilePath: {stepDataJsonFilePath}");
         if (instance != null && instance != this)
         {
             Destroy(this.gameObject);
@@ -50,8 +55,10 @@ public class OverallStepCounter : MonoBehaviour
 
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            Debug.Log("Fresh logout detected in OverallStepCounter. Resetting step data.");
+            Debug.Log("[INIT] ========== FRESH LOGOUT DETECTED ==========");
+            Debug.Log($"[INIT] File exists before reset: {File.Exists(stepDataJsonFilePath)}");
             ResetStepDataCompletely(); // reset in-memory and delete file
+            Debug.Log($"[INIT] File exists after reset: {File.Exists(stepDataJsonFilePath)}");
 
             // Keep the HasLoggedOut flag for other systems to observe; do NOT delete it here.
             // Suppress immediate device queries while in the logged-out display state
@@ -62,21 +69,54 @@ public class OverallStepCounter : MonoBehaviour
             return;
         }
 
+        // Check if we're signed in and should load cloud data
+        // If yes, suppress immediate events from local load - cloud will fire them
+        bool signedIn = Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
+                        Unity.Services.Authentication.AuthenticationService.Instance != null &&
+                        Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn;
+        bool suppressCloudRestore = PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1;
+        
+        if (signedIn && !suppressCloudRestore)
+        {
+            Debug.Log("[INIT] Signed in - will wait for cloud data before firing events");
+            waitingForCloudData = true;
+        }
 
+        Debug.Log("[INIT] Normal startup - loading step data");
         LoadStepData();
     }
     void Start()
     {
+        Debug.Log("[START] ========== OverallStepCounter.Start() called ==========");
+        Debug.Log($"[START] HasLoggedOut: {PlayerPrefs.GetInt("HasLoggedOut", 0)}, CloudRestored: {PlayerPrefs.GetInt("CloudRestored", 0)}, SuppressCloudRestore: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
+
         // If the player is signed in and we are allowed to restore from cloud,
         // attempt to load cloud data on app start. This ensures data is retained
         // when the game is restarted/reopened while signed in.
-        if (Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
-            Unity.Services.Authentication.AuthenticationService.Instance != null &&
-            Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn &&
-            PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
+        // If suppression is set but the user is already signed in, clear suppression and load
+        bool signedIn = Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
+                        Unity.Services.Authentication.AuthenticationService.Instance != null &&
+                        Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn;
+        bool suppressCloudRestore = PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1;
+
+        if (signedIn && suppressCloudRestore)
         {
+            Debug.Log("[START] Signed in but SuppressCloudRestore=1 — clearing suppression and loading cloud data");
+            PlayerPrefs.DeleteKey("SuppressCloudRestore");
+            PlayerPrefs.Save();
+        }
+
+        if (signedIn && PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
+        {
+            Debug.Log("[START] User is signed in and cloud restore is enabled - calling LoadStepDataFromCloud()");
             // Fire-and-forget cloud load; it will set `cloudLoaded` and fire events when done
             _ = LoadStepDataFromCloud();
+        }
+        else
+        {
+            Debug.Log($"[START] Cloud load NOT triggered - Initialized: {Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized}, " +
+                $"IsSignedIn: {(Unity.Services.Authentication.AuthenticationService.Instance != null ? Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn.ToString() : "null")}, " +
+                $"SuppressCloudRestore: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
         }
 
         // If cloud hasn't loaded yet, start immediate local update
@@ -121,6 +161,13 @@ public class OverallStepCounter : MonoBehaviour
                     GetOverallSteps();
                 }
             }
+
+            // Ensure real-time updates resume on focus if not suppressed
+            if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            {
+                Debug.Log("[StepCounter] Focus regained — starting refresh coroutine for real-time updates.");
+                refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
+            }
         }
     }
 
@@ -132,7 +179,8 @@ public class OverallStepCounter : MonoBehaviour
 
     public void GetOverallSteps()
     {
-        Debug.Log("[StepCounter] Running GetOverallSteps...");
+        float queryStartTime = Time.realtimeSinceStartup;
+        if (debugStepQueries) Debug.Log($"[StepCounter] Running GetOverallSteps at {queryStartTime:F2}s...");
         if (!baselineEstablished && stepData.baselineSteps > 0)
         {
             Debug.Log("[StepCounter] Waiting for baseline to be established...");
@@ -152,8 +200,19 @@ public class OverallStepCounter : MonoBehaviour
             // Same day as registration/logout
             request.Since(DateTime.Today).OnQuerySuccess((stepCount) =>
             {
-                if (debugStepQueries) Debug.Log($"[StepQuery] registration-day returned deviceSteps={stepCount}");
-                Debug.Log($"[GetOverallSteps] Device steps: {stepCount}, Baseline: {stepData.baselineSteps}");
+                float callbackTime = Time.realtimeSinceStartup;
+                float latency = callbackTime - queryStartTime;
+                if (debugStepQueries) Debug.Log($"[StepQuery] registration-day returned deviceSteps={stepCount} (latency: {latency:F3}s)");
+                Debug.Log($"[GetOverallSteps] Device steps: {stepCount}, Baseline: {stepData.baselineSteps}, Callback latency: {latency:F3}s");
+
+                // 🔴 CRITICAL BUG CHECK: If device steps < baseline, baseline is invalid (from old player)
+                if (stepData.baselineSteps > 0 && stepCount < stepData.baselineSteps)
+                {
+                    Debug.LogError($"[GetOverallSteps] ⚠️ INVALID STATE: Device steps ({stepCount}) < Baseline ({stepData.baselineSteps})! " +
+                        $"This means baseline is from old player. Resetting baseline to 0.");
+                    stepData.baselineSteps = 0;
+                    baselineEstablished = false;
+                }
 
                 int previousSteps = overallSteps;
 
@@ -170,12 +229,18 @@ public class OverallStepCounter : MonoBehaviour
                     overallSteps = Mathf.Max(0, stepCount - offset);
                     Debug.Log($"[GetOverallSteps] Normal mode: {stepCount} - {offset} = {overallSteps}");
                 }
-                // Fire event immediately if steps changed
-                if (overallSteps != previousSteps)
+                // Fire event only if steps changed by threshold (debounce jitter)
+                int stepDelta = Math.Abs(overallSteps - previousSteps);
+                if (stepDelta >= stepChangeThreshold)
                 {
                     int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                     int dailySteps = stepData.baselineSteps > 0 ? Math.Max(0, stepCount - stepData.baselineSteps) : Math.Max(0, stepCount - dailyOffset);
+                    if (debugStepQueries) Debug.Log($"[GetOverallSteps] Step change: {previousSteps} → {overallSteps} (delta: {stepDelta})");
                     onStepsUpdated?.Invoke(overallSteps, dailySteps);
+                }
+                else if (stepDelta > 0 && debugStepQueries)
+                {
+                    Debug.Log($"[GetOverallSteps] Ignoring small change: {previousSteps} → {overallSteps} (delta: {stepDelta} < threshold: {stepChangeThreshold})");
                 }
 
                 SaveStepData();
@@ -196,6 +261,15 @@ public class OverallStepCounter : MonoBehaviour
                 {
                     if (debugStepQueries) Debug.Log($"[StepQuery] daysSinceLastSave==1 returned deviceSteps={stepCount}");
                     Debug.Log($"[GetOverallSteps] Multi-day: Device steps: {stepCount}, Baseline: {stepData.baselineSteps}");
+
+                    // 🔴 CRITICAL BUG CHECK: If device steps < baseline, baseline is invalid
+                    if (stepData.baselineSteps > 0 && stepCount < stepData.baselineSteps)
+                    {
+                        Debug.LogError($"[GetOverallSteps] ⚠️ INVALID STATE: Device steps ({stepCount}) < Baseline ({stepData.baselineSteps})! " +
+                            $"Resetting baseline to 0.");
+                        stepData.baselineSteps = 0;
+                        baselineEstablished = false;
+                    }
 
                     int todaySteps;
                     int previousSteps = overallSteps;
@@ -231,12 +305,18 @@ public class OverallStepCounter : MonoBehaviour
                     overallSteps = overallStepsBeforeToday + todaySteps;
                     Debug.Log($"[GetOverallSteps] Overall accumulated: {overallStepsBeforeToday} + {todaySteps} = {overallSteps}");
 
-                    // Fire event immediately if steps changed
-                    if (overallSteps != previousSteps)
+                    // Fire event only if steps changed by threshold (debounce jitter)
+                    int stepDelta = Math.Abs(overallSteps - previousSteps);
+                    if (stepDelta >= stepChangeThreshold)
                     {
                         int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                         int dailySteps = stepData.baselineSteps > 0 ? Math.Max(0, stepCount - stepData.baselineSteps) : Math.Max(0, stepCount - dailyOffset);
+                        if (debugStepQueries) Debug.Log($"[GetOverallSteps] Step change: {previousSteps} → {overallSteps} (delta: {stepDelta})");
                         onStepsUpdated?.Invoke(overallSteps, dailySteps);
+                    }
+                    else if (stepDelta > 0 && debugStepQueries)
+                    {
+                        Debug.Log($"[GetOverallSteps] Ignoring small change: {previousSteps} → {overallSteps} (delta: {stepDelta} < threshold: {stepChangeThreshold})");
                     }
 
                     SaveStepData();
@@ -272,12 +352,18 @@ public class OverallStepCounter : MonoBehaviour
                         Debug.Log($"[GetOverallSteps] Long multi-day: {overallStepsBeforeToday} + {todaySteps} = {overallSteps}");
                         int previousSteps = overallSteps;
 
-                        // Fire event immediately if steps changed
-                        if (overallSteps != previousSteps)
+                        // Fire event only if steps changed by threshold (debounce jitter)
+                        int stepDelta = Math.Abs(overallSteps - previousSteps);
+                        if (stepDelta >= stepChangeThreshold)
                         {
                             int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                             int dailySteps = stepData.baselineSteps > 0 ? Math.Max(0, stepCount - stepData.baselineSteps) : Math.Max(0, stepCount - dailyOffset);
+                            if (debugStepQueries) Debug.Log($"[GetOverallSteps] Step change: {previousSteps} → {overallSteps} (delta: {stepDelta})");
                             onStepsUpdated?.Invoke(overallSteps, dailySteps);
+                        }
+                        else if (stepDelta > 0 && debugStepQueries)
+                        {
+                            Debug.Log($"[GetOverallSteps] Ignoring small change: {previousSteps} → {overallSteps} (delta: {stepDelta} < threshold: {stepChangeThreshold})");
                         }
 
                         SaveStepData();
@@ -313,12 +399,18 @@ public class OverallStepCounter : MonoBehaviour
                         Debug.Log($"[GetOverallSteps] Very long multi-day: {overallStepsBeforeToday} + {todaySteps} = {overallSteps}");
 
                         int previousSteps = overallSteps;
-                        // Fire event immediately if steps changed
-                        if (overallSteps != previousSteps)
+                        // Fire event only if steps changed by threshold (debounce jitter)
+                        int stepDelta = Math.Abs(overallSteps - previousSteps);
+                        if (stepDelta >= stepChangeThreshold)
                         {
-                                int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
-                                int dailySteps = stepData.baselineSteps > 0 ? Math.Max(0, stepCount - stepData.baselineSteps) : Math.Max(0, stepCount - dailyOffset);
+                            int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
+                            int dailySteps = stepData.baselineSteps > 0 ? Math.Max(0, stepCount - stepData.baselineSteps) : Math.Max(0, stepCount - dailyOffset);
+                            if (debugStepQueries) Debug.Log($"[GetOverallSteps] Step change: {previousSteps} → {overallSteps} (delta: {stepDelta})");
                             onStepsUpdated?.Invoke(overallSteps, dailySteps);
+                        }
+                        else if (stepDelta > 0 && debugStepQueries)
+                        {
+                            Debug.Log($"[GetOverallSteps] Ignoring small change: {previousSteps} → {overallSteps} (delta: {stepDelta} < threshold: {stepChangeThreshold})");
                         }
                         SaveStepData();
                     }).Execute();
@@ -389,19 +481,29 @@ public class OverallStepCounter : MonoBehaviour
 
             stepData.dailySteps = calculatedDailySteps;
 
-                // Safety clamp: daily should not exceed overall stored value
-                if (stepData.dailySteps > stepData.overallSteps)
-                {
-                    stepData.dailySteps = stepData.overallSteps;
-                }
+            // Safety clamp: daily should not exceed overall stored value
+            if (stepData.dailySteps > stepData.overallSteps)
+            {
+                stepData.dailySteps = stepData.overallSteps;
+            }
 
+            // Save baseline to disk ONLY if we're on a post-logout day OR if no baseline exists
+            // On logout day with baseline in memory, keep baseline at 0 in the file
+            bool shouldSaveBaseline = stepData.baselineSteps > 0 && DateTime.Today != DateTime.Parse(stepData.registrationTime).Date;
+            int baselineToSave = shouldSaveBaseline ? stepData.baselineSteps : 0;
+            int originalBaseline = stepData.baselineSteps; // Preserve in-memory baseline
+
+            stepData.baselineSteps = baselineToSave; // Temporarily set for save
             string stepDataJson = JsonUtility.ToJson(stepData);
             File.WriteAllText(stepDataJsonFilePath, stepDataJson);
+            stepData.baselineSteps = originalBaseline; // Restore in-memory baseline
 
-            Debug.Log($"[PERSISTENCE] Step data saved - Overall: {overallSteps}, Daily: {stepData.dailySteps}, Baseline: {stepData.baselineSteps}");
+            Debug.Log($"[PERSISTENCE] Step data saved - Overall: {overallSteps}, Daily: {stepData.dailySteps}, " +
+                $"OverallBeforeToday: {overallStepsBeforeToday}, Baseline (in-memory): {originalBaseline}, Baseline (saved to disk): {baselineToSave}");
 
-            // Fire event with potentially DIFFERENT values
-            onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+            // NOTE: Do NOT fire onStepsUpdated here! SaveStepData is called from GetOverallSteps callbacks,
+            // and GetOverallSteps already fires the event before SaveStepData is called.
+            // Double-firing causes UI oscillation and race conditions.
         }).Execute();
     }
 
@@ -444,12 +546,22 @@ public class OverallStepCounter : MonoBehaviour
                 stepData.dailySteps = stepData.overallSteps;
             }
 
+            // Save baseline to disk ONLY if we're on a post-logout day OR if no baseline exists
+            // On logout day with baseline in memory, keep baseline at 0 in the file
+            bool shouldSaveBaseline = stepData.baselineSteps > 0 && DateTime.Today != DateTime.Parse(stepData.registrationTime).Date;
+            int baselineToSave = shouldSaveBaseline ? stepData.baselineSteps : 0;
+            int originalBaseline = stepData.baselineSteps; // Preserve in-memory baseline
+
+            stepData.baselineSteps = baselineToSave; // Temporarily set for save
             string stepDataJson = JsonUtility.ToJson(stepData);
             File.WriteAllText(stepDataJsonFilePath, stepDataJson);
+            stepData.baselineSteps = originalBaseline; // Restore in-memory baseline
 
-            Debug.Log($"[PERSISTENCE] Step data saved (async) - Overall: {overallSteps}, Daily: {stepData.dailySteps}, Baseline: {stepData.baselineSteps}");
+            Debug.Log($"[PERSISTENCE] Step data saved (async) - Overall: {overallSteps}, Daily: {stepData.dailySteps}, Baseline (in-memory): {originalBaseline}, Baseline (saved to disk): {baselineToSave}");
 
-            onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+            // NOTE: Do NOT fire onStepsUpdated here! SaveStepDataAsync is called from GetOverallSteps callbacks,
+            // and GetOverallSteps already fires the event before SaveStepDataAsync is called.
+            // Double-firing causes UI oscillation and race conditions.
 
             tcs.SetResult(true);
         }).Execute();
@@ -459,7 +571,10 @@ public class OverallStepCounter : MonoBehaviour
 
     public void InitializeStepData()
     {
+        Debug.Log("[INIT DATA] ========== InitializeStepData() called (fresh startup) ==========");
         stepData = new StepData(); // Create fresh step data
+        Debug.Log("[INIT DATA] Fresh StepData created - all values at 0");
+
         StepCounterRequest request = new StepCounterRequest();
         request.Since(DateTime.Today).OnQuerySuccess((stepCount) =>
         {
@@ -467,6 +582,7 @@ public class OverallStepCounter : MonoBehaviour
             stepData.registrationTime = DateTime.Today.ToString("yyyy-MM-dd");
             stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
             stepData.numberOfSteps = overallSteps;
+            Debug.Log($"[INIT DATA] Device query returned: {stepCount} steps - registrationTime set to today");
             SaveStepData();
         }).Execute();
     }
@@ -497,8 +613,13 @@ public class OverallStepCounter : MonoBehaviour
 
             Debug.Log($"[LOGOUT INIT] In-memory baseline established: {currentDeviceSteps} device steps for logout day only (not saved to disk)");
 
-            // Start real-time step counting after baseline is set if queries aren't suppressed
-            if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            // Clear the suppression flag now that baseline is set, so real-time updates can begin
+            PlayerPrefs.DeleteKey("SuppressStepQuery");
+            PlayerPrefs.Save();
+            Debug.Log("[LOGOUT INIT] Cleared SuppressStepQuery flag - real-time updates enabled");
+
+            // Start real-time step counting after baseline is set
+            if (refreshStepsCoroutine == null)
             {
                 refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
                 Debug.Log("[LOGOUT INIT] Started refresh coroutine for real-time counting");
@@ -508,6 +629,9 @@ public class OverallStepCounter : MonoBehaviour
 
     public void LoadStepData()
     {
+        Debug.Log("[PERSISTENCE] ========== LoadStepData() called ==========");
+        Debug.Log($"[PERSISTENCE] File exists: {File.Exists(stepDataJsonFilePath)}");
+
         // If logout suppression is set, or if services are initialized and the user is not signed in,
         // treat this as a logged-out state: show zeros and do NOT restore local/cloud data.
         if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
@@ -531,43 +655,14 @@ public class OverallStepCounter : MonoBehaviour
             return;
         }
 
-        // If services are initialized and the user is NOT signed in, treat as logged-out too
-        if (Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized)
-        {
-            try
-            {
-                if (Unity.Services.Authentication.AuthenticationService.Instance != null &&
-                    !Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn)
-                {
-                    Debug.Log("[PERSISTENCE] Unity Services initialized but user not signed in — initializing zeros.");
-                    stepData = new StepData();
-                    overallSteps = 0;
-                    stepData.dailySteps = 0;
-                    stepData.overallSteps = 0;
-                    overallStepsBeforeToday = 0;
-                    baselineEstablished = false;
-
-                    if (refreshStepsCoroutine != null)
-                    {
-                        StopCoroutine(RefreshStepsLoop());
-                        refreshStepsCoroutine = null;
-                    }
-
-                    onStepsUpdated?.Invoke(0, 0);
-                    onLoaded?.Invoke();
-                    return;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[PERSISTENCE] Error checking sign-in state: {e.Message}");
-            }
-        }
+        // If services are initialized and user NOT signed in, we still allow local restore.
+        // Only full reset happens when HasLoggedOut/SuppressCloudRestore are set above.
+        // This keeps offline/local steps intact across app restarts while signed-out.
         if (File.Exists(stepDataJsonFilePath))
         {
             string stepDataJson = File.ReadAllText(stepDataJsonFilePath);
             stepData = JsonUtility.FromJson<StepData>(stepDataJson);
-            Debug.Log($"[PERSISTENCE] Local step data loaded: {stepDataJson}");
+            Debug.Log($"[PERSISTENCE] Local step data file loaded - Full JSON: {stepDataJson}");
 
             if (stepData == null)
             {
@@ -575,28 +670,72 @@ public class OverallStepCounter : MonoBehaviour
                 stepData = new StepData();
             }
 
+            // ⚠️ CRITICAL SAFETY CHECK: Never restore local file data if user just logged out
+            // After logout, ONLY cloud data should be restored (if user signs back in)
+            bool userJustLoggedOut = PlayerPrefs.GetInt("HasLoggedOut", 0) == 1;
+            if (userJustLoggedOut)
+            {
+                Debug.LogError("[PERSISTENCE] ⚠️ CRITICAL: User just logged out but local file still has data! Ignoring file data.");
+                stepData = new StepData();
+                overallSteps = 0;
+                overallStepsBeforeToday = 0;
+                baselineEstablished = false;
+                onStepsUpdated?.Invoke(0, 0);
+                onLoaded?.Invoke();
+                return;
+            }
+
             // Restore in-memory values from saved data so UI and consumers see the correct counts
             overallSteps = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
             overallStepsBeforeToday = stepData.numberOfSteps;
             baselineEstablished = (stepData.baselineSteps > 0);
 
-            Debug.Log($"[PERSISTENCE] Restored overallSteps={overallSteps}, dailySteps={stepData.dailySteps}, baseline={stepData.baselineSteps}");
+            Debug.Log($"[PERSISTENCE] Loaded file contents: numberOfSteps={stepData.numberOfSteps}, overallSteps={stepData.overallSteps}, " +
+                $"dailySteps={stepData.dailySteps}, baselineSteps={stepData.baselineSteps}, registrationTime={stepData.registrationTime}");
+            Debug.Log($"[PERSISTENCE] Restored in-memory: overallSteps={overallSteps}, overallStepsBeforeToday={overallStepsBeforeToday}, baseline={stepData.baselineSteps}");
 
-            // Notify listeners immediately with the restored values
-            onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+            // ⚠️ SAFETY CHECK: If baseline exists but registration time is old, baseline is stale
+            if (stepData.baselineSteps > 0)
+            {
+                DateTime regTime = DateTime.Parse(stepData.registrationTime).Date;
+                int daysSinceReg = (DateTime.Today - regTime).Days;
+                if (daysSinceReg > 1)
+                {
+                    Debug.LogWarning($"[PERSISTENCE] ⚠️ WARNING: Baseline ({stepData.baselineSteps}) exists but registration was {daysSinceReg} days ago. Clearing baseline.");
+                    stepData.baselineSteps = 0;
+                    baselineEstablished = false;
+                }
+            }
 
-            // Notify listeners that step data has been loaded (local or processed)
-            onLoaded?.Invoke();
+            // Only fire events immediately if NOT waiting for cloud data
+            // If cloud load is pending, it will fire events when it completes
+            if (!waitingForCloudData)
+            {
+                Debug.Log("[PERSISTENCE] Firing events from local data (not waiting for cloud)");
+                onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+                onLoaded?.Invoke();
+            }
+            else
+            {
+                Debug.Log("[PERSISTENCE] Suppressing events - waiting for cloud data to load");
+            }
 
             // Check if this data came from a cloud restore
             bool isCloudRestored = PlayerPrefs.GetInt("CloudRestored", 0) == 1;
-            
+            bool hasLoggedOut = PlayerPrefs.GetInt("HasLoggedOut", 0) == 1;
+            Debug.Log($"[PERSISTENCE] Flags: CloudRestored={isCloudRestored}, HasLoggedOut={hasLoggedOut}");
+
+            if (isCloudRestored && !hasLoggedOut)
+            {
+                Debug.Log("[PERSISTENCE] ⚠️ WARNING - Cloud data is marked as restored but player hasn't logged out. This might cause old data to load.");
+            }
+
             // If cloud data was restored, skip the immediate recalculation to preserve cloud values
             // The cloud load already queried device and computed accurate values
             if (isCloudRestored)
             {
                 Debug.Log("[PERSISTENCE] Cloud-restored data detected — skipping immediate GetOverallSteps() to preserve cloud values.");
-                
+
                 // Still start the refresh coroutine for future updates
                 if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
                 {
@@ -632,6 +771,8 @@ public class OverallStepCounter : MonoBehaviour
         }
         else
         {
+            Debug.Log("[PERSISTENCE] Step data file DOES NOT EXIST - creating fresh data");
+            Debug.Log("[PERSISTENCE] Calling InitializeStepData() to create new step data");
             InitializeStepData();
         }
     }
@@ -643,6 +784,10 @@ public class OverallStepCounter : MonoBehaviour
 
     public async Task LoadStepDataFromCloud()
     {
+        Debug.Log("[CLOUD LOAD DEBUG] ========== LoadStepDataFromCloud() called ==========");
+        Debug.Log($"[CLOUD LOAD DEBUG] SuppressCloudRestore: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
+        Debug.Log($"[CLOUD LOAD DEBUG] HasLoggedOut: {PlayerPrefs.GetInt("HasLoggedOut", 0)}");
+
         // Respect an explicit suppression set by logout flow to avoid restoring previous counts
         if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
         {
@@ -651,13 +796,13 @@ public class OverallStepCounter : MonoBehaviour
                 Unity.Services.Authentication.AuthenticationService.Instance != null &&
                 Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn)
             {
-                Debug.Log("[CloudSync] Suppression present but user is signed in — clearing suppression and proceeding with cloud load.");
+                Debug.Log("[CLOUD LOAD DEBUG] Suppression present but user is signed in — clearing suppression and proceeding with cloud load.");
                 PlayerPrefs.DeleteKey("SuppressCloudRestore");
                 PlayerPrefs.Save();
             }
             else
             {
-                Debug.LogWarning("[CloudSync] Skipped loading from cloud — cloud restore suppressed after logout.");
+                Debug.LogWarning("[CLOUD LOAD DEBUG] Skipped loading from cloud — cloud restore suppressed after logout.");
                 return;
             }
         }
@@ -665,8 +810,9 @@ public class OverallStepCounter : MonoBehaviour
         try
         {
             string stepDataJson = await CloudSaver.LoadDataFromCloud("stepData");
+            Debug.Log($"[CLOUD LOAD DEBUG] ========== Cloud data retrieved ==========");
             Debug.Log($"[CLOUD LOAD DEBUG] Raw cloud JSON received: {stepDataJson}");
-            
+
             stepData = JsonUtility.FromJson<StepData>(stepDataJson);
 
             Debug.Log($"[CLOUD LOAD DEBUG] Parsed cloud data:" +
@@ -677,15 +823,22 @@ public class OverallStepCounter : MonoBehaviour
                 $"\n  lastSaveTime: {stepData.lastSaveTime}" +
                 $"\n  registrationTime: {stepData.registrationTime}");
 
+            // WARNING: Check if cloud has old player data
+            if ((stepData.overallSteps > 0 || stepData.numberOfSteps > 0) && PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+            {
+                Debug.LogError($"[CLOUD LOAD DEBUG] ⚠️ CRITICAL: Cloud contains OLD PLAYER data (overall: {stepData.overallSteps}, numberOfSteps: {stepData.numberOfSteps}) " +
+                    $"but HasLoggedOut flag is set! This is OLD PLAYER DATA being loaded for NEW PLAYER!");
+            }
+
             // CRITICAL: Need to accumulate days between cloud save and today
             DateTime cloudLastSave = DateTime.Parse(stepData.lastSaveTime).Date;
             int daysSinceCloudSave = (DateTime.Today - cloudLastSave).Days;
-            
+
             Debug.Log($"[CLOUD LOAD DEBUG] Cloud last saved on {cloudLastSave:yyyy-MM-dd}, today is {DateTime.Today:yyyy-MM-dd}, daysSince={daysSinceCloudSave}");
 
             // Start with cloud base value
             int cloudBaseOverall = (stepData.overallSteps != 0) ? stepData.overallSteps : stepData.numberOfSteps;
-            
+
             if (daysSinceCloudSave == 0)
             {
                 // Same day as cloud save - just use cloud value and add today's new steps
@@ -693,14 +846,14 @@ public class OverallStepCounter : MonoBehaviour
                 request.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
                 {
                     Debug.Log($"[CLOUD LOAD DEBUG] Same-day load: stepCountToday={stepCountToday}");
-                    
+
                     overallSteps = cloudBaseOverall;
                     overallStepsBeforeToday = cloudBaseOverall;
 
                     // Compute daily
                     int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                     stepData.dailySteps = Math.Max(0, stepCountToday - dailyOffset);
-                    
+
                     Debug.Log($"[CLOUD LOAD DEBUG] Same-day: overall={overallSteps}, daily={stepData.dailySteps}");
 
                     stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
@@ -721,6 +874,7 @@ public class OverallStepCounter : MonoBehaviour
                     PlayerPrefs.Save();
 
                     cloudLoaded = true;
+                    waitingForCloudData = false;  // Cloud data received, clear waiting flag
                     onLoaded?.Invoke();
                 }).Execute();
             }
@@ -731,13 +885,13 @@ public class OverallStepCounter : MonoBehaviour
                 request.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
                 {
                     Debug.Log($"[CLOUD LOAD DEBUG] 1-day gap: stepCountToday={stepCountToday}");
-                    
+
                     overallSteps = cloudBaseOverall + stepCountToday;
                     overallStepsBeforeToday = cloudBaseOverall;
 
                     int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                     stepData.dailySteps = Math.Max(0, stepCountToday - dailyOffset);
-                    
+
                     Debug.Log($"[CLOUD LOAD DEBUG] 1-day gap: cloudBase={cloudBaseOverall}, today={stepCountToday}, overall={overallSteps}, daily={stepData.dailySteps}");
 
                     stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
@@ -758,6 +912,7 @@ public class OverallStepCounter : MonoBehaviour
                     PlayerPrefs.Save();
 
                     cloudLoaded = true;
+                    waitingForCloudData = false;  // Cloud data received, clear waiting flag
                     onLoaded?.Invoke();
                 }).Execute();
             }
@@ -768,18 +923,18 @@ public class OverallStepCounter : MonoBehaviour
                 request.From(cloudLastSave).To(DateTime.Today).OnQuerySuccess((stepCountRange) =>
                 {
                     int accumulatedSteps = cloudBaseOverall + stepCountRange;
-                    
+
                     StepCounterRequest requestToday = new StepCounterRequest();
                     requestToday.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
                     {
                         Debug.Log($"[CLOUD LOAD DEBUG] Multi-day gap ({daysSinceCloudSave} days): rangeSteps={stepCountRange}, todaySteps={stepCountToday}");
-                        
+
                         overallSteps = accumulatedSteps;
                         overallStepsBeforeToday = cloudBaseOverall + stepCountRange;
 
                         int dailyOffset = PlayerPrefs.GetInt(DailyStepOffsetKey, 0);
                         stepData.dailySteps = Math.Max(0, stepCountToday - dailyOffset);
-                        
+
                         Debug.Log($"[CLOUD LOAD DEBUG] Multi-day: cloudBase={cloudBaseOverall}, range={stepCountRange}, overall={overallSteps}, daily={stepData.dailySteps}");
 
                         stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
@@ -800,6 +955,7 @@ public class OverallStepCounter : MonoBehaviour
                         PlayerPrefs.Save();
 
                         cloudLoaded = true;
+                        waitingForCloudData = false;  // Cloud data received, clear waiting flag
                         onLoaded?.Invoke();
                     }).Execute();
                 }).Execute();
@@ -808,8 +964,20 @@ public class OverallStepCounter : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"Failed to load step data from cloud: {e.Message}");
-            // Fall back to local data
-            LoadStepData();
+            waitingForCloudData = false;  // Cloud load failed, clear waiting flag
+            
+            // If we were waiting for cloud but it failed, fire events from local data now
+            if (stepData != null && overallSteps >= 0)
+            {
+                Debug.Log("[CLOUD LOAD] Cloud failed - firing events from local data as fallback");
+                onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+                onLoaded?.Invoke();
+            }
+            else
+            {
+                // Fall back to local data load
+                LoadStepData();
+            }
         }
     }
 
@@ -858,9 +1026,15 @@ public class OverallStepCounter : MonoBehaviour
     {
         while (true)
         {
-            if (debugStepQueries) Debug.Log($"[RefreshLoop] tick - refreshInterval={refreshInterval}");
+            float tickTime = Time.realtimeSinceStartup;
+            if (debugStepQueries) Debug.Log($"[RefreshLoop] tick at {tickTime:F2}s - refreshInterval={refreshInterval}");
             GetOverallSteps();
-            yield return new WaitForSeconds(Mathf.Max(0.2f, refreshInterval)); // configurable polling interval, min 0.2s for testing
+
+            // GetOverallSteps() is async and will fire onStepsUpdated event when device query completes.
+            // Do NOT recalculate or fire events here - that causes duplicate/conflicting events.
+            // The async callback in GetOverallSteps() is the ONLY place we fire events.
+
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval)); // configurable polling interval, min 0.1s for very responsive testing
         }
     }
 
@@ -892,7 +1066,7 @@ public class OverallStepCounter : MonoBehaviour
 
     public void ResetStepDataCompletely()
     {
-        Debug.Log("[RESET] Complete reset - clearing ALL step data");
+        Debug.Log("[RESET] ============ COMPLETE RESET - CLEARING ALL STEP DATA ============");
 
         // Reset all in-memory data
         stepData = new StepData();
@@ -912,7 +1086,11 @@ public class OverallStepCounter : MonoBehaviour
         if (File.Exists(stepDataJsonFilePath))
         {
             File.Delete(stepDataJsonFilePath);
-            Debug.Log("Step data file deleted completely.");
+            Debug.Log($"[RESET] Step data file DELETED: {stepDataJsonFilePath}");
+        }
+        else
+        {
+            Debug.Log($"[RESET] Step data file did not exist: {stepDataJsonFilePath}");
         }
 
         // Clear ALL PlayerPrefs related to steps

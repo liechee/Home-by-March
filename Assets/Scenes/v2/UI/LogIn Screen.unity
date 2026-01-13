@@ -1546,7 +1546,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1953494812}
         m_TargetAssemblyTypeName: NameChangePanel, Assembly-CSharp
-        m_MethodName: changeName
+        m_MethodName: ChangeName
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

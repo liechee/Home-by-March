@@ -41,17 +41,30 @@ public class Authenticator : MonoBehaviour
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
             Debug.Log("signed in:  " + AuthenticationService.Instance.PlayerId);
+            
+            Debug.Log($"[SIGN-IN] SuppressCloudRestore before clear: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
+            Debug.Log($"[SIGN-IN] HasLoggedOut before clear: {PlayerPrefs.GetInt("HasLoggedOut", 0)}");
 
             // Clear logout suppression so cloud/local restores can occur now that user is signed in
             if (PlayerPrefs.HasKey("SuppressCloudRestore"))
             {
+                Debug.Log("[SIGN-IN] Clearing SuppressCloudRestore flag");
                 PlayerPrefs.DeleteKey("SuppressCloudRestore");
             }
             if (PlayerPrefs.HasKey("SuppressStepQuery"))
             {
+                Debug.Log("[SIGN-IN] Clearing SuppressStepQuery flag");
                 PlayerPrefs.DeleteKey("SuppressStepQuery");
             }
+            // IMPORTANT: Clear HasLoggedOut so local/cloud restores are allowed for the new session
+            if (PlayerPrefs.HasKey("HasLoggedOut"))
+            {
+                Debug.Log("[SIGN-IN] Clearing HasLoggedOut flag for new session");
+                PlayerPrefs.DeleteKey("HasLoggedOut");
+            }
             PlayerPrefs.Save();
+            
+            Debug.Log($"[SIGN-IN] SuppressCloudRestore after clear: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
 
             // Trigger cloud load of step data if the OverallStepCounter exists
             try
@@ -59,8 +72,13 @@ public class Authenticator : MonoBehaviour
                 OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
                 if (stepCounter != null)
                 {
+                    Debug.Log("[SIGN-IN] Found OverallStepCounter - calling LoadStepDataFromCloud()");
                     // Load cloud data (will early-exit if suppression remains)
                     await stepCounter.LoadStepDataFromCloud();
+                }
+                else
+                {
+                    Debug.LogWarning("[SIGN-IN] OverallStepCounter NOT FOUND");
                 }
             }
             catch (Exception e)

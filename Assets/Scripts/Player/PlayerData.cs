@@ -83,10 +83,23 @@ public class PlayerData : MonoBehaviour
         {
             Debug.Log("Fresh logout detected. Resetting gameplay stats but preserving player name.");
             string savedName = playerName; // Preserve the loaded name
+            
+            // If the saved name is still "New Player", this is a new player who needs to set their name
+            bool isNewPlayer = (savedName == "New Player" || string.IsNullOrEmpty(savedName));
+            Debug.Log($"[PlayerData] IsNewPlayer check: savedName='{savedName}', isNewPlayer={isNewPlayer}");
+            
             // Reset player data to safe defaults so UI shows Level 1 after logout
             Reset();
             playerName = savedName; // Restore the player name
             Debug.Log($"[PlayerData] After Reset, restored playerName to: '{playerName}'");
+            
+            // If this is a truly new player, reset to default name so they're prompted to change it
+            if (isNewPlayer)
+            {
+                playerName = "New Player";
+                Debug.Log($"[PlayerData] New player detected - name set to 'New Player' for prompt");
+            }
+            
             // Persist the reset player data locally so startup state is consistent
             SavePlayerData();
             UpdateCurrentStats();

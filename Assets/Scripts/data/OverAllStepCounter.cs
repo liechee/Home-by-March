@@ -32,18 +32,13 @@ public class OverallStepCounter : MonoBehaviour
     private const string DailyStepOffsetKey = "DailyStepOffset";
     public static event Action<int, int> onStepsUpdated; // overall, daily
     private bool baselineEstablished = false;
-
-    // //for debug purposes
-    // public TMP_Text overallStepsText;
-    // public TMP_Text overallStepsBeforeTodayText;
-
     private static OverallStepCounter instance;
     private bool waitingForCloudData = false;  // Flag to suppress local events if cloud load pending
     
     void Awake()
     {
         stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
-        Debug.Log($"[INIT] OverallStepCounter.Awake() - stepDataJsonFilePath: {stepDataJsonFilePath}");
+        
         if (instance != null && instance != this)
         {
             Destroy(this.gameObject);
@@ -55,127 +50,56 @@ public class OverallStepCounter : MonoBehaviour
 
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            Debug.Log("[INIT] ========== FRESH LOGOUT DETECTED ==========");
-            Debug.Log($"[INIT] File exists before reset: {File.Exists(stepDataJsonFilePath)}");
-            ResetStepDataCompletely(); // reset in-memory and delete file
-            Debug.Log($"[INIT] File exists after reset: {File.Exists(stepDataJsonFilePath)}");
-
-            // Keep the HasLoggedOut flag for other systems to observe; do NOT delete it here.
-            // Suppress immediate device queries while in the logged-out display state
+            ResetStepDataCompletely();
             PlayerPrefs.SetInt("SuppressStepQuery", 1);
             PlayerPrefs.Save();
-
-            InitializeStepDataAfterLogout(); // Use special initialization (in-memory baseline only)
+            InitializeStepDataAfterLogout();
             return;
         }
 
-        // Check if we're signed in and should load cloud data
-        // If yes, suppress immediate events from local load - cloud will fire them
-        bool signedIn = Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
-                        Unity.Services.Authentication.AuthenticationService.Instance != null &&
-                        Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn;
-        bool suppressCloudRestore = PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1;
-        
-        if (signedIn && !suppressCloudRestore)
-        {
-            Debug.Log("[INIT] Signed in - will wait for cloud data before firing events");
+        bool signedIn = IsServiceSignedIn();
+        if (signedIn && PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
             waitingForCloudData = true;
-        }
 
-        Debug.Log("[INIT] Normal startup - loading step data");
         LoadStepData();
     }
     void Start()
     {
-        Debug.Log("[START] ========== OverallStepCounter.Start() called ==========");
-        Debug.Log($"[START] HasLoggedOut: {PlayerPrefs.GetInt("HasLoggedOut", 0)}, CloudRestored: {PlayerPrefs.GetInt("CloudRestored", 0)}, SuppressCloudRestore: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
-
-        // If the player is signed in and we are allowed to restore from cloud,
-        // attempt to load cloud data on app start. This ensures data is retained
-        // when the game is restarted/reopened while signed in.
-        // If suppression is set but the user is already signed in, clear suppression and load
-        bool signedIn = Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
-                        Unity.Services.Authentication.AuthenticationService.Instance != null &&
-                        Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn;
+        bool signedIn = IsServiceSignedIn();
         bool suppressCloudRestore = PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1;
 
         if (signedIn && suppressCloudRestore)
         {
-            Debug.Log("[START] Signed in but SuppressCloudRestore=1 — clearing suppression and loading cloud data");
             PlayerPrefs.DeleteKey("SuppressCloudRestore");
             PlayerPrefs.Save();
         }
 
-        if (signedIn && PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
-        {
-            Debug.Log("[START] User is signed in and cloud restore is enabled - calling LoadStepDataFromCloud()");
-            // Fire-and-forget cloud load; it will set `cloudLoaded` and fire events when done
+        if (signedIn && !suppressCloudRestore)
             _ = LoadStepDataFromCloud();
-        }
-        else
-        {
-            Debug.Log($"[START] Cloud load NOT triggered - Initialized: {Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized}, " +
-                $"IsSignedIn: {(Unity.Services.Authentication.AuthenticationService.Instance != null ? Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn.ToString() : "null")}, " +
-                $"SuppressCloudRestore: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
-        }
 
-        // If cloud hasn't loaded yet, start immediate local update
         if (!cloudLoaded)
-        {
-            GetOverallSteps(); // Delay actual step count until after potential cloud load
-        }
+            GetOverallSteps();
 
-        if (refreshStepsCoroutine == null)
-        {
-            if (PlayerPrefs.GetInt("SuppressStepQuery", 0) == 1)
-            {
-                Debug.Log("[StepCounter] Step queries suppressed by PlayerPrefs (SuppressStepQuery=1). Refresh coroutine not started.");
-            }
-            else
-            {
-                refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
-            }
-        }
+        if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
     }
 
     void OnApplicationFocus(bool hasFocus)
     {
-        // When app regains focus, re-check cloud if signed in and suppression is not active.
-        if (hasFocus)
+        if (!hasFocus) return;
+
+        bool signedIn = IsServiceSignedIn();
+        if (signedIn && PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
         {
-            // Only attempt cloud operations if Unity Services are initialized to avoid the
-            // ServicesInitializationException seen when AuthenticationService.Instance is accessed too early.
-            if (Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
-                Unity.Services.Authentication.AuthenticationService.Instance != null &&
-                Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn &&
-                PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
-            {
-                if (!cloudLoaded)
-                {
-                    Debug.Log("[CloudSync] App resumed and user signed in — attempting cloud load.");
-                    _ = LoadStepDataFromCloud();
-                }
-                else
-                {
-                    // Optionally refresh steps from device to catch up with new counts
-                    GetOverallSteps();
-                }
-            }
-
-            // Ensure real-time updates resume on focus if not suppressed
-            if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
-            {
-                Debug.Log("[StepCounter] Focus regained — starting refresh coroutine for real-time updates.");
-                refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
-            }
+            if (!cloudLoaded)
+                _ = LoadStepDataFromCloud();
+            else
+                GetOverallSteps();
         }
-    }
 
-    // void Update(){
-    //     GetOverallSteps();
-    //     // overallStepsText.text = "Overall steps: " +  overallSteps;
-    //     // overallStepsBeforeTodayText.text = "Overall steps before today: " + overallStepsBeforeToday;
-    // }
+        if (refreshStepsCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
+    }
 
     public void GetOverallSteps()
     {
@@ -200,10 +124,6 @@ public class OverallStepCounter : MonoBehaviour
             // Same day as registration/logout
             request.Since(DateTime.Today).OnQuerySuccess((stepCount) =>
             {
-                float callbackTime = Time.realtimeSinceStartup;
-                float latency = callbackTime - queryStartTime;
-                if (debugStepQueries) Debug.Log($"[StepQuery] registration-day returned deviceSteps={stepCount} (latency: {latency:F3}s)");
-                Debug.Log($"[GetOverallSteps] Device steps: {stepCount}, Baseline: {stepData.baselineSteps}, Callback latency: {latency:F3}s");
 
                 // 🔴 CRITICAL BUG CHECK: If device steps < baseline, baseline is invalid (from old player)
                 if (stepData.baselineSteps > 0 && stepCount < stepData.baselineSteps)
@@ -259,8 +179,6 @@ public class OverallStepCounter : MonoBehaviour
                 overallStepsBeforeToday = stepData.numberOfSteps;
                 request.Since(DateTime.Today).OnQuerySuccess((stepCount) =>
                 {
-                    if (debugStepQueries) Debug.Log($"[StepQuery] daysSinceLastSave==1 returned deviceSteps={stepCount}");
-                    Debug.Log($"[GetOverallSteps] Multi-day: Device steps: {stepCount}, Baseline: {stepData.baselineSteps}");
 
                     // 🔴 CRITICAL BUG CHECK: If device steps < baseline, baseline is invalid
                     if (stepData.baselineSteps > 0 && stepCount < stepData.baselineSteps)
@@ -632,6 +550,10 @@ public class OverallStepCounter : MonoBehaviour
         Debug.Log("[PERSISTENCE] ========== LoadStepData() called ==========");
         Debug.Log($"[PERSISTENCE] File exists: {File.Exists(stepDataJsonFilePath)}");
 
+        // Check if this is a brand new player who has never signed in
+        bool hasEverSignedIn = PlayerPrefs.GetInt("HasEverSignedIn", 0) == 1;
+        Debug.Log($"[PERSISTENCE] HasEverSignedIn: {hasEverSignedIn}");
+
         // If logout suppression is set, or if services are initialized and the user is not signed in,
         // treat this as a logged-out state: show zeros and do NOT restore local/cloud data.
         if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
@@ -652,6 +574,14 @@ public class OverallStepCounter : MonoBehaviour
 
             onStepsUpdated?.Invoke(0, 0);
             onLoaded?.Invoke();
+            return;
+        }
+
+        // If this is a brand new user who has NEVER signed in, start fresh (don't restore local data)
+        if (!hasEverSignedIn)
+        {
+            Debug.Log("[PERSISTENCE] Brand new user (never signed in) — starting fresh with device query");
+            InitializeStepData();
             return;
         }
 
@@ -1026,15 +956,8 @@ public class OverallStepCounter : MonoBehaviour
     {
         while (true)
         {
-            float tickTime = Time.realtimeSinceStartup;
-            if (debugStepQueries) Debug.Log($"[RefreshLoop] tick at {tickTime:F2}s - refreshInterval={refreshInterval}");
             GetOverallSteps();
-
-            // GetOverallSteps() is async and will fire onStepsUpdated event when device query completes.
-            // Do NOT recalculate or fire events here - that causes duplicate/conflicting events.
-            // The async callback in GetOverallSteps() is the ONLY place we fire events.
-
-            yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval)); // configurable polling interval, min 0.1s for very responsive testing
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval));
         }
     }
 
@@ -1047,7 +970,6 @@ public class OverallStepCounter : MonoBehaviour
             StopCoroutine(refreshStepsCoroutine);
             refreshStepsCoroutine = StartCoroutine(RefreshStepsLoop());
         }
-        Debug.Log($"[StepCounter] refreshInterval set to {refreshInterval}");
     }
     async void OnApplicationQuit()
     {
@@ -1066,44 +988,34 @@ public class OverallStepCounter : MonoBehaviour
 
     public void ResetStepDataCompletely()
     {
-        Debug.Log("[RESET] ============ COMPLETE RESET - CLEARING ALL STEP DATA ============");
-
-        // Reset all in-memory data
         stepData = new StepData();
-        stepData.baselineSteps = 0; // Clear baseline
+        stepData.baselineSteps = 0;
         overallSteps = 0;
         overallStepsBeforeToday = 0;
         cloudLoaded = false;
 
-        // Stop any running coroutines
         if (refreshStepsCoroutine != null)
         {
             StopCoroutine(refreshStepsCoroutine);
             refreshStepsCoroutine = null;
         }
 
-        // Delete the file completely
         if (File.Exists(stepDataJsonFilePath))
-        {
             File.Delete(stepDataJsonFilePath);
-            Debug.Log($"[RESET] Step data file DELETED: {stepDataJsonFilePath}");
-        }
-        else
-        {
-            Debug.Log($"[RESET] Step data file did not exist: {stepDataJsonFilePath}");
-        }
 
-        // Clear ALL PlayerPrefs related to steps
         PlayerPrefs.DeleteKey(OverallStepOffsetKey);
         PlayerPrefs.DeleteKey(DailyStepOffsetKey);
         PlayerPrefs.DeleteKey("SuppressStepQuery");
         PlayerPrefs.Save();
 
-        // FIRE EVENT with BOTH as 0
         onStepsUpdated?.Invoke(0, 0);
-        Debug.Log("[RESET] Fired event - BOTH daily and overall set to 0");
+    }
 
-        Debug.Log("OverallStepCounter data completely reset to 0.");
+    private bool IsServiceSignedIn()
+    {
+        return Unity.Services.Core.UnityServices.State == Unity.Services.Core.ServicesInitializationState.Initialized &&
+               Unity.Services.Authentication.AuthenticationService.Instance != null &&
+               Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn;
     }
 
 }

@@ -50,6 +50,9 @@ public class LogOutManager : MonoBehaviour
         PlayerPrefs.SetInt("SuppressCloudRestore", 1);
         // Clear CloudRestored so subsequent startups won't think a cloud restore occurred
         PlayerPrefs.DeleteKey("CloudRestored");
+        // Clear HasEverSignedIn so new player starts fresh (not restoring old player's local data)
+        PlayerPrefs.DeleteKey("HasEverSignedIn");
+        Debug.Log("[LOGOUT] Cleared HasEverSignedIn - new session will start fresh");
         PlayerPrefs.Save();
 
         // 5. UI + Restart

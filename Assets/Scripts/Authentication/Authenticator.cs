@@ -45,6 +45,10 @@ public class Authenticator : MonoBehaviour
             Debug.Log($"[SIGN-IN] SuppressCloudRestore before clear: {PlayerPrefs.GetInt("SuppressCloudRestore", 0)}");
             Debug.Log($"[SIGN-IN] HasLoggedOut before clear: {PlayerPrefs.GetInt("HasLoggedOut", 0)}");
 
+            // Mark that this user has signed in at least once (for data retention logic)
+            PlayerPrefs.SetInt("HasEverSignedIn", 1);
+            Debug.Log("[SIGN-IN] Set HasEverSignedIn=1 (user has now signed in)");
+
             // Clear logout suppression so cloud/local restores can occur now that user is signed in
             if (PlayerPrefs.HasKey("SuppressCloudRestore"))
             {

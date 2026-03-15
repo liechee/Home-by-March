@@ -176,6 +176,7 @@ public class LogOutManager : MonoBehaviour
     //  Cloud
     // ─────────────────────────────────────────────────────────
 
+    [Obsolete]
     private async Task DeleteAllCloudSaveData()
     {
         try

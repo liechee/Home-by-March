@@ -257,10 +257,14 @@ public class OverallStepCounter : MonoBehaviour
 
     private IEnumerator RefreshLoop()
     {
+        // Fire immediately on start so there is no wait for the first tick.
+        // This eliminates the refreshInterval delay on every scene load and
+        // after the post-logout baseline is established.
+        GetOverallSteps();
         while (true)
         {
-            GetOverallSteps();
             yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval));
+            GetOverallSteps();
         }
     }
 
@@ -495,11 +499,12 @@ public class OverallStepCounter : MonoBehaviour
             if (age > 1) { stepData.baselineSteps = 0; baselineEstablished = false; }
         }
 
-        if (!waitingForCloudData)
-        {
-            onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
-            onLoaded?.Invoke();
-        }
+        // Always fire immediately from local file so the UI is never blank.
+        // If cloud data is pending it will fire onStepsUpdated again when it arrives,
+        // which simply overwrites these values. Local file is always the correct
+        // last-known state — it was saved on the previous app exit.
+        onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+        onLoaded?.Invoke();
 
         bool cloudRestored = PlayerPrefs.GetInt("CloudRestored", 0) == 1;
         if (!cloudRestored && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
@@ -557,10 +562,18 @@ public class OverallStepCounter : MonoBehaviour
             PlayerPrefs.DeleteKey("SuppressStepQuery");
             PlayerPrefs.Save();
 
+            Debug.Log($"[LOGOUT INIT] Baseline {deviceSteps} set (in-memory). HasLoggedOut cleared.");
+
+            // Fire immediately so the UI shows 0 without waiting for RefreshLoop's first tick.
+            // The new player genuinely has 0 net steps at this point (baseline just set),
+            // so this is accurate — not a placeholder.
+            onStepsUpdated?.Invoke(0, 0);
+
+            // Start refresh loop — all subsequent real-time updates come from here.
+            // The first GetOverallSteps() inside the loop will correctly subtract the
+            // baseline and show any steps taken since logout began.
             if (refreshCoroutine == null)
                 refreshCoroutine = StartCoroutine(RefreshLoop());
-
-            Debug.Log($"[LOGOUT INIT] Baseline {deviceSteps} set (in-memory). HasLoggedOut cleared.");
         }).Execute();
     }
 

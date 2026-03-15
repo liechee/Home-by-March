@@ -66,24 +66,35 @@ public class UserLevel : MonoBehaviour
 
     void Awake()
     {
-        playerData = FindObjectOfType<PlayerData>();
+        playerData  = FindObjectOfType<PlayerData>();
         stepCounter = FindObjectOfType<OverallStepCounter>();
 
-        // Subscribe first — never miss an event
+        // Subscribe before anything else so no event is ever missed
         OverallStepCounter.onStepsUpdated += OnStepsUpdated;
         OverallStepCounter.onLoaded       += OnStepDataLoaded;
 
-        // Show zeros immediately so the UI is never blank or stale
-        ZeroDisplayState();
-        RefreshUI();
+        // Initialize display thresholds so the UI is structurally valid even before
+        // real step data arrives — but do NOT zero-flash if we already have data.
+        if (playerData != null)
+            totalStepsForNextLevel = CalculateTotalStepsForLevel(playerData.level + 1);
+    }
 
-        // If OverallStepCounter already has valid data (e.g. this scene loaded after
-        // the counter ran its first query), pull the values right now instead of
-        // waiting for the next event tick.
-        if (stepCounter != null && stepCounter.stepData != null &&
-            (stepCounter.overallSteps > 0 || stepCounter.cloudLoaded))
+    void Start()
+    {
+        // By Start(), OverallStepCounter has had its own Awake + Start run.
+        // Pull whatever it currently holds — this covers the scene-reload case
+        // where the counter is DontDestroyOnLoad and already has correct values.
+        // The check uses stepData != null rather than overallSteps > 0 so players
+        // with genuinely 0 steps still get a correct (zero) display, not a stale one.
+        if (stepCounter != null && stepCounter.stepData != null)
         {
             ApplySteps(stepCounter.overallSteps, stepCounter.stepData.dailySteps);
+        }
+        else
+        {
+            // stepCounter not ready yet — show zeros cleanly until the event fires
+            ZeroDisplayState();
+            RefreshUI();
         }
     }
 

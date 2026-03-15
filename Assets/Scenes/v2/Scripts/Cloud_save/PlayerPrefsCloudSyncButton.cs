@@ -13,7 +13,11 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
     private OverallStepCounter overallStepCounter;
     private PlayerData playerData;
     [SerializeField] CoppraGames.DailyRewardsWindow dailyRewardsWindow;
+    // [SerializeField] private DynamicInterface dynamicInterface;
+    // [SerializeField] private StaticInterface staticInterface;
+
     private InventoryObject inventory;
+    private static PlayerPrefsCloudSyncButton instance;
 
     void Awake()
     {

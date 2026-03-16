@@ -116,10 +116,32 @@ public class OverallStepCounter : MonoBehaviour
     /// True once overallStepsBeforeToday is calculated for this session.
     /// After settling, every poll uses the fast single-query path.
     /// </summary>
-    private bool beforeTodaySettled = false;
+    private bool beforeTodaySettled      = false;
+    /// <summary>
+    /// True after the first QueryTodayAndUpdate recalibrates OverallOffsetKey
+    /// on a same-day disk restore. Prevents recalibration from running every poll.
+    /// </summary>
+    private bool offsetRecalibrated = false;
 
-    private bool waitingForCloudData    = false;
+    private bool waitingForCloudData     = false;
     private bool pendingLocalFireOnStart = false;
+
+    /// <summary>
+    /// True while a StepCounterRequest is in-flight.
+    /// Prevents RefreshLoop from stacking new requests before the previous
+    /// one returns — a primary cause of increasing query latency after each
+    /// logout, because unresolved requests pile up in the hardware sensor queue.
+    /// </summary>
+    private bool queryInFlight = false;
+
+    /// <summary>
+    /// The most recent device step count returned by a StepCounterRequest.
+    /// Updated in QueryTodayAndUpdate on every successful callback.
+    /// Used by CommitCurrentStateToDisk so it can calculate an accurate dailySteps
+    /// even if the app exits before the first poll callback has completed.
+    /// </summary>
+    private int  lastKnownDeviceSteps = 0;
+    private bool lastKnownDeviceCaptured = false;
 
     [HideInInspector] public bool initializingFreshData = false;
 
@@ -235,7 +257,18 @@ public class OverallStepCounter : MonoBehaviour
         stepData.lastSaveTime  = DateTime.Today.ToString("yyyy-MM-dd");
         stepData.numberOfSteps = overallSteps;
         stepData.overallSteps  = overallSteps;
-        // stepData.dailySteps is current from the last SaveStepData poll call
+
+        // Recalculate dailySteps using the last known device reading so the
+        // value on disk is always accurate at exit — even if the app exits
+        // before diskSaveInterval has elapsed or before the first poll callback
+        // has completed (which would leave stepData.dailySteps at 0).
+        if (lastKnownDeviceCaptured)
+        {
+            int recalcDaily = CalcDailySteps(lastKnownDeviceSteps);
+            if (recalcDaily >= 0)
+                stepData.dailySteps = recalcDaily;
+        }
+
         WriteToDisk();
         Debug.Log($"[EXIT] Committed — overall={overallSteps}, daily={stepData.dailySteps}");
     }
@@ -247,13 +280,17 @@ public class OverallStepCounter : MonoBehaviour
     public void GetOverallSteps()
     {
         if (isLoggingOut) return;
+        // Skip if a device query is already in-flight. This prevents the refresh
+        // loop from stacking requests when the device sensor is slow to respond —
+        // the primary cause of increasing latency after repeated logouts.
+        if (queryInFlight) return;
         if (string.IsNullOrEmpty(stepData?.registrationTime) ||
             string.IsNullOrEmpty(stepData?.lastSaveTime)) return;
 
         int gen = sessionGen;
 
         // Fast path: overallStepsBeforeToday already settled — one query per poll.
-        if (beforeTodaySettled) { QueryTodayAndUpdate(gen); return; }
+        if (beforeTodaySettled) { queryInFlight = true; QueryTodayAndUpdate(gen); return; }
 
         // First-time path: compute overallStepsBeforeToday then settle.
         DateTime lastSave = DateTime.Parse(stepData.lastSaveTime).Date;
@@ -266,6 +303,7 @@ public class OverallStepCounter : MonoBehaviour
                 ? stepData.numberOfSteps - GetEstimatedTodayStepsFromDisk()
                 : 0;
             beforeTodaySettled = true;
+            queryInFlight = true;
             QueryTodayAndUpdate(gen);
         }
         else if (days == 1)
@@ -274,6 +312,7 @@ public class OverallStepCounter : MonoBehaviour
             savedDailyBase          = 0;
             overallStepsBeforeToday = stepData.numberOfSteps;
             beforeTodaySettled      = true;
+            queryInFlight = true;
             QueryTodayAndUpdate(gen);
         }
         else if (days <= 10)
@@ -284,6 +323,7 @@ public class OverallStepCounter : MonoBehaviour
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = snapshot + range;
                 beforeTodaySettled      = true;
+                queryInFlight = true;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -294,6 +334,7 @@ public class OverallStepCounter : MonoBehaviour
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = range;
                 beforeTodaySettled      = true;
+                queryInFlight = true;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -303,12 +344,46 @@ public class OverallStepCounter : MonoBehaviour
     {
         new StepCounterRequest().Since(DateTime.Today).OnQuerySuccess((deviceNow) =>
         {
+            // Always clear the in-flight flag so the next poll can proceed,
+            // whether this callback is stale, a logout happened, or it is valid.
+            queryInFlight = false;
+
+            // Record the raw device count regardless of stale/logout state.
+            // CommitCurrentStateToDisk uses this to compute accurate dailySteps
+            // at exit even if no full poll cycle has completed yet this session.
+            if (!isLoggingOut)
+            {
+                lastKnownDeviceSteps   = deviceNow;
+                lastKnownDeviceCaptured = true;
+            }
+
             if (IsStale(gen) || isLoggingOut) return;
+
+            // On the first query after restoring from disk (same-day reopen),
+            // OverallOffsetKey is stale — it was set at the previous session's
+            // app-open, not this one. Recalibrate it so CalcTodayNetSteps gives
+            // the correct delta going forward.
+            //
+            // Correct offset = deviceNow - todayStepsAlreadyRecorded
+            // where todayStepsAlreadyRecorded = steps already in the disk save
+            // for today = overallSteps (restored) - overallStepsBeforeToday.
+            //
+            // This only applies on the first call (before beforeTodaySettled locked in)
+            // when NOT in mid-session sign-in and NOT post-logout (those have their own
+            // zero-points). Cloud-loaded sessions set OverallOffsetKey themselves.
+            if (!offsetRecalibrated && !signedInThisSession && stepData.baselineSteps == 0)
+            {
+                offsetRecalibrated = true;
+                int todayAlreadyRecorded = Math.Max(0, overallSteps - overallStepsBeforeToday);
+                int recalibratedOffset   = Math.Max(0, deviceNow - todayAlreadyRecorded);
+                PlayerPrefs.SetInt(OverallOffsetKey, recalibratedOffset);
+                PlayerPrefs.Save();
+                Debug.Log($"[RECAL] OverallOffsetKey recalibrated once: deviceNow={deviceNow}, todayRecorded={todayAlreadyRecorded}, offset={recalibratedOffset}");
+            }
 
             int prev = overallSteps;
 
             // Overall = everything before today + today's net steps.
-            // "today's net steps" depends on session type:
             int todayNet = CalcTodayNetSteps(deviceNow);
             overallSteps = overallStepsBeforeToday + todayNet;
 
@@ -641,6 +716,7 @@ public class OverallStepCounter : MonoBehaviour
 
         cloudLoaded         = true;
         waitingForCloudData = false;
+        offsetRecalibrated  = true; // Cloud sets its own offset — skip generic recalibration
 
         onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
         onLoaded?.Invoke();
@@ -838,6 +914,10 @@ public class OverallStepCounter : MonoBehaviour
         signedInThisSession     = false;
         pendingLocalFireOnStart = false;
         initializingFreshData   = false;
+        offsetRecalibrated      = false;
+        queryInFlight           = false;
+        lastKnownDeviceSteps    = 0;
+        lastKnownDeviceCaptured = false;
 
         StopRefreshCoroutine();
 
@@ -910,6 +990,13 @@ public class OverallStepCounter : MonoBehaviour
             if (appOpenCaptured) return; // Already set (e.g. from post-logout path)
             appOpenDeviceSteps = n;
             appOpenCaptured    = true;
+            // Seed lastKnownDeviceSteps immediately so CommitCurrentStateToDisk
+            // has a valid reading even if no full poll cycle completes before exit.
+            if (!lastKnownDeviceCaptured)
+            {
+                lastKnownDeviceSteps    = n;
+                lastKnownDeviceCaptured = true;
+            }
             Debug.Log($"[SESSION] App-open steps captured: {n}");
         }).Execute();
     }
@@ -934,6 +1021,10 @@ public class OverallStepCounter : MonoBehaviour
         signInDeviceSteps       = 0;
         signedInThisSession     = false;
         pendingLocalFireOnStart = false;
+        offsetRecalibrated      = false;
+        queryInFlight           = false;
+        lastKnownDeviceSteps    = 0;
+        lastKnownDeviceCaptured = false;
         StopRefreshCoroutine();
     }
 

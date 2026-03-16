@@ -120,16 +120,19 @@ public class UserLevel : MonoBehaviour
             return;
         }
 
-        // Skip if nothing changed (OverallStepCounter already debounces by threshold,
-        // but guard here too in case onLoaded triggers a duplicate)
-        if (newOverall == overallStepCount && newDaily == dailyStepCount) return;
-
+        // NOTE: Do NOT add an equality guard here.
+        // Cloud finalization fires onStepsUpdated with the correct value even when
+        // it happens to equal what is already displayed (e.g. both 0 post-logout).
+        // Dropping it would leave the UI stale until the next scene reload.
+        // OverallStepCounter's stepChangeThreshold already debounces noisy poll updates,
+        // so duplicate suppression here is unnecessary and harmful.
         ApplySteps(newOverall, newDaily);
     }
 
     /// <summary>
     /// Fired by OverallStepCounter when initial data is ready (local file or cloud).
-    /// Re-pulls values in case the step count was set before onStepsUpdated fired.
+    /// Always applies unconditionally — never skip, even if values appear unchanged,
+    /// because this may be the cloud value arriving after a local-file placeholder.
     /// </summary>
     private void OnStepDataLoaded()
     {

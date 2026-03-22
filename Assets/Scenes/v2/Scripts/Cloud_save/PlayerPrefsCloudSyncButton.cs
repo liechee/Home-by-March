@@ -1,23 +1,13 @@
 using UnityEngine;
 using System.Threading.Tasks;
-using System.IO;
 
-/// <summary>
-/// UI button handler for manual cloud sync.
-/// Save is blocked during logout via isLoggingOut on OverallStepCounter,
-/// and by LogOutManager disabling this component before the wipe runs.
-/// Load is blocked while HasLoggedOut is set (post-logout, pre-new-sign-in).
-/// </summary>
 public class PlayerPrefsCloudSyncButton : MonoBehaviour
 {
-    private OverallStepCounter overallStepCounter;
-    private PlayerData playerData;
+    private OverallStepCounter                      overallStepCounter;
+    private PlayerData                              playerData;
     [SerializeField] CoppraGames.DailyRewardsWindow dailyRewardsWindow;
-    // [SerializeField] private DynamicInterface dynamicInterface;
-    // [SerializeField] private StaticInterface staticInterface;
-
-    private InventoryObject inventory;
-    private static PlayerPrefsCloudSyncButton instance;
+    [SerializeField] private InventoryObject        inventory;
+    [SerializeField] private InventoryObject        inventory2;
 
     void Awake()
     {
@@ -28,32 +18,69 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         if (playerData         == null) Debug.LogWarning("[CloudSync] PlayerData not found!");
         if (dailyRewardsWindow == null) Debug.LogWarning("[CloudSync] DailyRewardsWindow not found!");
         if (inventory          == null) Debug.LogWarning("[CloudSync] Inventory not found!");
+        if (inventory2         == null) Debug.LogWarning("[CloudSync] Inventory2 not found!");
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Save
-    // ─────────────────────────────────────────────────────────
+    async void Start()
+    {
+ 
+        await LoadNonStepDataFromCloud();
+    }
+
+
+    async void OnApplicationQuit()
+    {
+        if (!IsSafeToProceed("OnApplicationQuit")) return;
+        await SaveNonStepDataToCloud();
+    }
+
+    async void OnApplicationPause(bool isPaused)
+    {
+        if (!isPaused || !IsSafeToProceed("OnApplicationPause")) return;
+        await SaveNonStepDataToCloud();
+    }
+
 
     public async void SaveToCloud()
     {
-        // Guard: LogOutManager disables this component before the wipe,
-        // but double-check isLoggingOut in case of race conditions.
-        if (overallStepCounter != null && overallStepCounter.isLoggingOut)
-        {
-            Debug.LogWarning("[CloudSync] SaveToCloud blocked — logout in progress.");
-            return;
-        }
+        if (!IsSafeToProceed("SaveToCloud")) return;
 
-        Debug.Log("[CloudSync] ── SaveToCloud ────────────────────────────────────");
+        Debug.Log("[CloudSync] ── SaveToCloud ──────────────────────────────────");
 
-        await PlayerPrefsCloudSync.SaveAllToCloud();
-        Debug.Log("[CloudSync] PlayerPrefs saved.");
-
+        // Step data: delegated to OverallStepCounter (owns its own state + guards)
         if (overallStepCounter != null)
         {
             await overallStepCounter.SaveStepDataToCloud();
             Debug.Log("[CloudSync] Step data saved.");
         }
+
+        await SaveNonStepDataToCloud();
+
+        Debug.Log("[CloudSync] ── SaveToCloud complete ─────────────────────────");
+    }
+
+
+    public async void LoadFromCloud()
+    {
+        if (!IsSafeToProceed("LoadFromCloud")) return;
+
+        Debug.Log("[CloudSync] ── LoadFromCloud (manual) ──────────────────────");
+
+        await LoadNonStepDataFromCloud();
+
+        if (overallStepCounter != null)
+        {
+            await overallStepCounter.LoadStepDataFromCloud();
+            Debug.Log("[CloudSync] Step data load requested.");
+        }
+
+        Debug.Log("[CloudSync] ── LoadFromCloud complete ──────────────────────");
+    }
+
+    private async Task SaveNonStepDataToCloud()
+    {
+        await PlayerPrefsCloudSync.SaveAllToCloud();
+        Debug.Log("[CloudSync] PlayerPrefs saved.");
 
         if (playerData != null)
         {
@@ -67,50 +94,30 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
             Debug.Log("[CloudSync] Daily quest progress saved.");
         }
 
+        // Inventory.Save() writes to local binary file.
+        // SaveInventoryToCloud uploads the current in-memory Container as JSON.
         if (inventory != null)
         {
             await inventory.SaveInventoryToCloud("inventory_save.json");
-            await inventory.SaveInventoryToCloud("New Inventory");
             Debug.Log("[CloudSync] Inventory saved.");
         }
 
-        Debug.Log("[CloudSync] ── SaveToCloud complete ───────────────────────────");
+        if (inventory2 != null)
+        {
+            await inventory2.SaveInventoryToCloud("inventory2_save.json");
+            Debug.Log("[CloudSync] Inventory2 saved.");
+        }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Load
-    // ─────────────────────────────────────────────────────────
 
-    public async void LoadFromCloud()
+    private async Task LoadNonStepDataFromCloud()
     {
-        // Block cloud load while in post-logout state.
-        // HasLoggedOut is set by LogOutManager and cleared by
-        // OverallStepCounter.InitializeStepDataAfterLogout() once the
-        // new session baseline is established.
-        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
-        {
-            Debug.LogWarning("[CloudSync] LoadFromCloud blocked — post-logout state.");
-            return;
-        }
+        if (!IsSafeToProceed("LoadNonStepDataFromCloud")) return;
 
-        // Also block if logout is actively in progress
-        if (overallStepCounter != null && overallStepCounter.isLoggingOut)
-        {
-            Debug.LogWarning("[CloudSync] LoadFromCloud blocked — logout in progress.");
-            return;
-        }
-
-        Debug.Log("[CloudSync] ── LoadFromCloud ───────────────────────────────────");
+        Debug.Log("[CloudSync] ── LoadNonStepDataFromCloud ───────────────────");
 
         await PlayerPrefsCloudSync.LoadAllFromCloud();
         Debug.Log("[CloudSync] PlayerPrefs loaded.");
-
-        if (overallStepCounter != null)
-        {
-            await overallStepCounter.LoadStepDataFromCloud();
-            ForceStepRefresh();
-            Debug.Log("[CloudSync] Step data loaded.");
-        }
 
         if (playerData != null)
         {
@@ -127,21 +134,53 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         if (inventory != null)
         {
             await inventory.LoadInventoryFromCloud("inventory_save.json");
-            await inventory.LoadInventoryFromCloud("New Inventory");
             Debug.Log("[CloudSync] Inventory loaded.");
         }
 
-        Debug.Log("[CloudSync] ── LoadFromCloud complete ──────────────────────────");
+        if (inventory2 != null)
+        {
+            await inventory2.LoadInventoryFromCloud("inventory2_save.json");
+            Debug.Log("[CloudSync] Inventory2 loaded.");
+        }
+
+        Debug.Log("[CloudSync] ── LoadNonStepDataFromCloud complete ──────────");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  Guard
+    // ─────────────────────────────────────────────────────────
+
+    private bool IsSafeToProceed(string caller)
+    {
+        if (overallStepCounter != null && overallStepCounter.isLoggingOut)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — logout in progress.");
+            return false;
+        }
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — post-logout state.");
+            return false;
+        }
+        if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — cloud restore suppressed.");
+            return false;
+        }
+        return true;
     }
 
     // ─────────────────────────────────────────────────────────
     //  Utility
     // ─────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Only use for a manual poll outside the normal refresh loop.
+    /// Do NOT call after LoadStepDataFromCloud — FinalizeCloudLoad handles that.
+    /// </summary>
     public void ForceStepRefresh()
     {
         if (overallStepCounter == null) return;
-        Debug.Log("[CloudSync] Forcing step refresh...");
         overallStepCounter.GetOverallSteps();
     }
 }

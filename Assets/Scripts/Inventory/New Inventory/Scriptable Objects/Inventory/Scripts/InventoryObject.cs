@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
-using UnityEditor;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System;
-
 
 public enum InterfaceType
 {
@@ -24,13 +22,24 @@ public class InventoryObject : ScriptableObject
     public InterfaceType type;
     public Inventory Container;
 
-    public InventorySlot[] GetSlots { get { return Container.Slots; } }
+    /// <summary>
+    /// Fired after cloud data is applied to Container.Slots in memory.
+    /// Any UI component that displays inventory data (progress bars, slot panels)
+    /// should subscribe to this and refresh itself when it fires — this solves the
+    /// "correct after scene change but wrong on first load" bug, because the cloud
+    /// load is async and completes after UI Start() methods have already run.
+    /// </summary>
+    public static event Action onInventoryLoaded;
 
+    public InventorySlot[] GetSlots => Container.Slots;
+
+    // ─────────────────────────────────────────────────────────
+    //  Inventory Operations
+    // ─────────────────────────────────────────────────────────
 
     public bool AddItem(Item _item, int _amount)
     {
-        if (EmptySlotCount <= 0)
-            return false;
+        if (EmptySlotCount <= 0) return false;
         InventorySlot slot = FindItemOnInventory(_item);
         if (!database.ItemObjects[_item.Id].stackable || slot == null)
         {
@@ -40,32 +49,25 @@ public class InventoryObject : ScriptableObject
         slot.AddAmount(_amount);
         return true;
     }
+
     public int EmptySlotCount
     {
         get
         {
-            int counter = 0;
+            int count = 0;
             for (int i = 0; i < GetSlots.Length; i++)
-            {
-                if (GetSlots[i].item.Id <= -1)
-                {
-                    counter++;
-                }
-            }
-            return counter;
+                if (GetSlots[i].item.Id <= -1) count++;
+            return count;
         }
     }
+
     public InventorySlot FindItemOnInventory(Item _item)
     {
         for (int i = 0; i < GetSlots.Length; i++)
-        {
-            if (GetSlots[i].item.Id == _item.Id)
-            {
-                return GetSlots[i];
-            }
-        }
+            if (GetSlots[i].item.Id == _item.Id) return GetSlots[i];
         return null;
     }
+
     public InventorySlot SetEmptySlot(Item _item, int _amount)
     {
         for (int i = 0; i < GetSlots.Length; i++)
@@ -76,7 +78,6 @@ public class InventoryObject : ScriptableObject
                 return GetSlots[i];
             }
         }
-        //set up functionality for full inventory
         return null;
     }
 
@@ -90,210 +91,115 @@ public class InventoryObject : ScriptableObject
         }
     }
 
+    // ─────────────────────────────────────────────────────────
+    //  Local Save / Load  (binary file)
+    // ─────────────────────────────────────────────────────────
 
     [ContextMenu("Save")]
     public void Save()
     {
-        //string saveData = JsonUtility.ToJson(this, true);
-        //BinaryFormatter bf = new BinaryFormatter();
-        //FileStream file = File.Create(string.Concat(Application.persistentDataPath, savePath));
-        //bf.Serialize(file, saveData);
-        //file.Close();
-
         IFormatter formatter = new BinaryFormatter();
-        Stream stream = new FileStream(string.Concat(Application.persistentDataPath, savePath), FileMode.Create, FileAccess.Write);
+        Stream stream = new FileStream(
+            string.Concat(Application.persistentDataPath, savePath),
+            FileMode.Create, FileAccess.Write);
         formatter.Serialize(stream, Container);
         stream.Close();
     }
 
-    public async Task SaveInventoryToCloud(string fileName)
-    {
-        Save();
-
-        // Always serialize from the current in-memory inventory
-        string inventoryData = JsonUtility.ToJson(Container, true);
-        Debug.Log("Saving Inventory Data: " + inventoryData);
-
-        await CloudSaver.SaveDataToCloud(fileName, inventoryData);
-        Debug.Log($"[CloudSaver] Uploading {fileName}: {JsonUtility.ToJson(inventoryData)}");
-
-        // Load the inventory data from the local file first
-        // if (File.Exists(string.Concat(Application.persistentDataPath, savePath)))
-        // {
-        //     IFormatter formatter = new BinaryFormatter();
-        //     Stream stream = new FileStream(string.Concat(Application.persistentDataPath, savePath), FileMode.Open, FileAccess.Read);
-        //     Inventory newContainer = (Inventory)formatter.Deserialize(stream);
-        //     stream.Close();
-
-        //     // Log the inventory data before saving
-        //     string inventoryData = JsonUtility.ToJson(newContainer, true);
-        //     Debug.Log("Saving Inventory Data: " + inventoryData);  // Log the data for debugging purposes
-
-        //     // Save the inventory data to the cloud
-        //     await CloudSaver.SaveDataToCloud(fileName, inventoryData);
-        // }
-        // else
-        // {
-        //     Debug.LogError("Inventory file not found!");
-        // }
-        // Save();
-        // string path = Path.Combine(Application.persistentDataPath, savePath);
-        // if (File.Exists(path))
-        // {
-        //     string json = File.ReadAllText(path);
-        //     await CloudSaver.SaveDataToCloud(fileName, json);
-        // }
-        // else
-        // {
-        //     Debug.LogError("Inventory file not found.");
-        // }
-    }
-
-    public async Task LoadInventoryFromCloud(string fileName)
-    {
-        // // Load the inventory data from the cloud
-        // string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);  // Assuming LoadDataFromCloud is an async method
-
-        // if (!string.IsNullOrEmpty(inventoryData))
-        // {
-        //     // Log the loaded data for debugging
-        //     Debug.Log("Loaded Inventory Data: " + inventoryData);
-
-        //     // Deserialize the inventory data
-        //     Inventory loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
-
-        //     // Now update the slots in the game with the loaded data
-        //     for (int i = 0; i < GetSlots.Length; i++)
-        //     {
-        //         GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
-        //     }
-
-        //     Save();
-        // }
-        // else
-        // {
-        //     Debug.LogError("Failed to load inventory data from the cloud.");
-        // }
-        // Load the inventory data from the cloud
-
-
-
-        // number 2
-        // string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);
-
-        // if (!string.IsNullOrEmpty(inventoryData))
-        // {
-        //     Debug.Log("Loaded Inventory Data: " + inventoryData);
-
-        //     Inventory loadedContainer = null;
-        //     try
-        //     {
-        //         loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
-        //     }
-        //     catch (System.Exception e)
-        //     {
-        //         Debug.LogError("Failed to deserialize inventory data: " + e.Message);
-        //     }
-
-        //     if (loadedContainer != null && loadedContainer.Slots != null && loadedContainer.Slots.Length == GetSlots.Length)
-        //     {
-        //         for (int i = 0; i < GetSlots.Length; i++)
-        //         {
-        //             GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
-        //         }
-        //         Save();
-        //     }
-        //     else
-        //     {
-        //         Debug.LogError("Loaded inventory data is invalid or slot count mismatch.");
-        //     }
-        // }
-        // else
-        // {
-        //     Debug.LogError("Failed to load inventory data from the cloud.");
-        // }
-        string inventoryData = await CloudSaver.LoadDataFromCloud(fileName);
-
-        Debug.Log("Loaded Inventory Data: " + inventoryData);
-        if (!string.IsNullOrEmpty(inventoryData))
-        {
-            Debug.Log("Loaded Inventory Data: " + inventoryData);
-
-            Inventory loadedContainer = null;
-            try
-            {
-                loadedContainer = JsonUtility.FromJson<Inventory>(inventoryData);
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError("Failed to deserialize inventory data: " + e.Message);
-            }
-
-            if (loadedContainer != null && loadedContainer.Slots != null)
-            {
-                // If slot count matches, just update
-                if (loadedContainer.Slots.Length == GetSlots.Length)
-                {
-                    for (int i = 0; i < GetSlots.Length; i++)
-                    {
-                        GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
-                    }
-                    Save();
-                    Debug.Log("Inventory loaded from cloud and applied to slots.");
-                }
-                // If slot count does NOT match, try to migrate
-                else
-                {
-                    Debug.LogWarning($"Slot count mismatch: loaded={loadedContainer.Slots.Length}, current={GetSlots.Length}. Attempting to migrate.");
-                    int minSlots = Mathf.Min(loadedContainer.Slots.Length, GetSlots.Length);
-                    for (int i = 0; i < minSlots; i++)
-                    {
-                        GetSlots[i].UpdateSlot(loadedContainer.Slots[i].item, loadedContainer.Slots[i].amount);
-                    }
-                    // Fill remaining slots with empty items if needed
-                    for (int i = minSlots; i < GetSlots.Length; i++)
-                    {
-                        GetSlots[i].UpdateSlot(new Item(), 0);
-                    }
-                    Save();
-                    Debug.Log("Inventory loaded with migration for slot count mismatch.");
-                }
-            }
-            else
-            {
-                Debug.LogError("Loaded inventory data is invalid.");
-            }
-        }
-        else
-        {
-            Debug.LogError("Failed to load inventory data from the cloud.");
-        }
-        Save();
-    }
     [ContextMenu("Load")]
     public void Load()
     {
-        if (File.Exists(string.Concat(Application.persistentDataPath, savePath)))
-        {
-            //BinaryFormatter bf = new BinaryFormatter();
-            //FileStream file = File.Open(string.Concat(Application.persistentDataPath, savePath), FileMode.Open);
-            //JsonUtility.FromJsonOverwrite(bf.Deserialize(file).ToString(), this);
-            //file.Close();
+        string path = string.Concat(Application.persistentDataPath, savePath);
+        if (!File.Exists(path)) return;
 
-            IFormatter formatter = new BinaryFormatter();
-            Stream stream = new FileStream(string.Concat(Application.persistentDataPath, savePath), FileMode.Open, FileAccess.Read);
-            Inventory newContainer = (Inventory)formatter.Deserialize(stream);
-            for (int i = 0; i < GetSlots.Length; i++)
-            {
-                GetSlots[i].UpdateSlot(newContainer.Slots[i].item, newContainer.Slots[i].amount);
-            }
-            stream.Close();
-        }
+        IFormatter formatter = new BinaryFormatter();
+        Stream stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        Inventory loaded = (Inventory)formatter.Deserialize(stream);
+        stream.Close();
+
+        for (int i = 0; i < GetSlots.Length; i++)
+            GetSlots[i].UpdateSlot(loaded.Slots[i].item, loaded.Slots[i].amount);
     }
+
     [ContextMenu("Clear")]
-    public void Clear()
+    public void Clear() => Container.Clear();
+
+    // ─────────────────────────────────────────────────────────
+    //  Cloud Save
+    // ─────────────────────────────────────────────────────────
+
+    public async Task SaveInventoryToCloud(string fileName)
     {
-        Container.Clear();
+        // Skip if empty so we don't overwrite cloud data with a blank inventory
+        if (EmptySlotCount == GetSlots.Length)
+        {
+            Debug.LogWarning($"[Inventory] SaveInventoryToCloud skipped — inventory '{name}' is empty.");
+            return;
+        }
+
+        // Persist to local binary file first so local and cloud stay in sync
+        Save();
+
+        string json = JsonUtility.ToJson(Container, true);
+        await CloudSaver.SaveDataToCloud(fileName, json);
+        Debug.Log($"[Inventory] Saved '{name}' to cloud as '{fileName}'.");
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  Cloud Load
+    // ─────────────────────────────────────────────────────────
+
+    public async Task LoadInventoryFromCloud(string fileName)
+    {
+        string json = await CloudSaver.LoadDataFromCloud(fileName);
+
+        if (string.IsNullOrEmpty(json))
+        {
+            Debug.LogWarning($"[Inventory] No cloud data found for '{fileName}'.");
+            return;
+        }
+
+        Inventory loaded = null;
+        try
+        {
+            loaded = JsonUtility.FromJson<Inventory>(json);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Inventory] Failed to deserialize '{fileName}': {e.Message}");
+            return;
+        }
+
+        if (loaded?.Slots == null)
+        {
+            Debug.LogError($"[Inventory] Deserialized data for '{fileName}' has null slots.");
+            return;
+        }
+
+        // Apply cloud slots to in-memory Container — handle slot count mismatches gracefully
+        int match = Mathf.Min(loaded.Slots.Length, GetSlots.Length);
+        for (int i = 0; i < match; i++)
+            GetSlots[i].UpdateSlot(loaded.Slots[i].item, loaded.Slots[i].amount);
+
+        // Zero out any extra slots if current inventory is larger than cloud save
+        for (int i = match; i < GetSlots.Length; i++)
+            GetSlots[i].UpdateSlot(new Item(), 0);
+
+        if (loaded.Slots.Length != GetSlots.Length)
+            Debug.LogWarning($"[Inventory] Slot count mismatch for '{fileName}': " +
+                             $"cloud={loaded.Slots.Length}, current={GetSlots.Length}. Migrated {match} slots.");
+
+        // Persist the cloud data to the local binary file so Load() on next
+        // app open restores from the correct state without needing a cloud fetch.
+        Save();
+
+        Debug.Log($"[Inventory] Loaded '{fileName}' from cloud and applied to '{name}'.");
+
+        // Notify all UI subscribers (progress bars, slot panels) that inventory
+        // data has changed. This solves the "shows correctly only after scene change"
+        // bug — subscribers refresh immediately when cloud data arrives, not just
+        // on scene load.
+        onInventoryLoaded?.Invoke();
     }
 }
 
@@ -301,90 +207,59 @@ public class InventoryObject : ScriptableObject
 public class Inventory
 {
     public InventorySlot[] Slots = new InventorySlot[28];
+
     public void Clear()
     {
         for (int i = 0; i < Slots.Length; i++)
-        {
             Slots[i].RemoveItem();
-        }
     }
 }
-
 
 public delegate void SlotUpdated(InventorySlot _slot);
 
 [System.Serializable]
 public class InventorySlot
 {
-    public ItemType[] AllowedItems = new ItemType[0];
-    [System.NonSerialized]
-    public UserInterface parent;
-    [System.NonSerialized]
-    public GameObject slotDisplay;
-    [System.NonSerialized]
-    public SlotUpdated OnAfterUpdate;
-    [System.NonSerialized]
-    public SlotUpdated OnBeforeUpdate;
-    public Item item = new Item();
-    public int amount;
+    public ItemType[]  AllowedItems = new ItemType[0];
+
+    [System.NonSerialized] public UserInterface parent;
+    [System.NonSerialized] public GameObject    slotDisplay;
+    [System.NonSerialized] public SlotUpdated   OnAfterUpdate;
+    [System.NonSerialized] public SlotUpdated   OnBeforeUpdate;
+
+    public Item item   = new Item();
+    public int  amount;
 
     public ItemObject ItemObject
     {
         get
         {
-            if (item.Id >= 0 && parent != null && parent.inventory != null && parent.inventory.database != null)
-            {
-                var itemObject = parent.inventory.database.ItemObjects[item.Id];
-                if (itemObject != null)
-                {
-                    return itemObject;
-                }
-            }
-            return null; // Or return a default ItemObject or handle the error as needed
+            if (item.Id >= 0 && parent?.inventory?.database != null)
+                return parent.inventory.database.ItemObjects[item.Id];
+            return null;
         }
     }
 
-    public InventorySlot()
-    {
-        UpdateSlot(new Item(), 0);
+    public InventorySlot()                          => UpdateSlot(new Item(), 0);
+    public InventorySlot(Item _item, int _amount)   => UpdateSlot(_item, _amount);
 
-    }
-    public InventorySlot(Item _item, int _amount)
-    {
-        UpdateSlot(_item, _amount);
-
-    }
     public void UpdateSlot(Item _item, int _amount)
     {
-        if (OnBeforeUpdate != null)
-        {
-            OnBeforeUpdate.Invoke(this);
-        }
-        item = _item;
+        OnBeforeUpdate?.Invoke(this);
+        item   = _item;
         amount = _amount;
-        if (OnAfterUpdate != null)
-        {
-            OnAfterUpdate.Invoke(this);
-        }
+        OnAfterUpdate?.Invoke(this);
     }
-    public void RemoveItem()
-    {
-        UpdateSlot(new Item(), 0);
 
-    }
-    public void AddAmount(int value)
-    {
-        UpdateSlot(item, amount += value);
-    }
+    public void RemoveItem()             => UpdateSlot(new Item(), 0);
+    public void AddAmount(int value)     => UpdateSlot(item, amount += value);
+
     public bool CanPlaceInSlot(ItemObject _itemObject)
     {
         if (AllowedItems.Length <= 0 || _itemObject == null || _itemObject.data.Id < 0)
             return true;
         for (int i = 0; i < AllowedItems.Length; i++)
-        {
-            if (_itemObject.type == AllowedItems[i])
-                return true;
-        }
+            if (_itemObject.type == AllowedItems[i]) return true;
         return false;
     }
 }

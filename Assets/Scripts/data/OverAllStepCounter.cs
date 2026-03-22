@@ -185,6 +185,17 @@ public class OverallStepCounter : MonoBehaviour
 
     void Start()
     {
+        // ── Startup diagnostic — shows exactly which path is taken ──────────
+        // If steps stay at 0, check these values in the log:
+        Debug.Log($"[StepCounter] Start() — " +
+            $"HasLoggedOut={PlayerPrefs.GetInt("HasLoggedOut", 0)}, " +
+            $"initializingFreshData={initializingFreshData}, " +
+            $"IsSignedIn={IsSignedIn()}, " +
+            $"SuppressCloudRestore={PlayerPrefs.GetInt("SuppressCloudRestore", 0)}, " +
+            $"SuppressStepQuery={PlayerPrefs.GetInt("SuppressStepQuery", 0)}, " +
+            $"fileExists={File.Exists(stepDataJsonFilePath)}, " +
+            $"waitingForCloudData={waitingForCloudData}");
+
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1) return;
         if (initializingFreshData) return;
 
@@ -225,8 +236,17 @@ public class OverallStepCounter : MonoBehaviour
             else              GetOverallSteps();
         }
 
-        if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
-            refreshCoroutine = StartCoroutine(RefreshLoop());
+        // Always ensure the loop is running when the app regains focus.
+        // The loop may have stopped if the coroutine was killed during a
+        // long background period or after a scene reload.
+        if (PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+        {
+            if (refreshCoroutine == null)
+            {
+                Debug.Log("[StepCounter] Regained focus — starting RefreshLoop.");
+                refreshCoroutine = StartCoroutine(RefreshLoop());
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -242,9 +262,25 @@ public class OverallStepCounter : MonoBehaviour
 
     async void OnApplicationPause(bool isPaused)
     {
-        if (!isPaused || isLoggingOut) return;
-        CommitCurrentStateToDisk();
-        await SaveStepDataToCloud();
+        if (isLoggingOut) return;
+
+        if (isPaused)
+        {
+            // App going to background — commit state immediately.
+            CommitCurrentStateToDisk();
+            await SaveStepDataToCloud();
+        }
+        else
+        {
+            // App returning from background — restart the loop if it stopped.
+            // Unity may stop coroutines when the app is paused depending on
+            // platform and background mode settings.
+            if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            {
+                Debug.Log("[StepCounter] Resuming from pause — restarting RefreshLoop.");
+                refreshCoroutine = StartCoroutine(RefreshLoop());
+            }
+        }
     }
 
     /// <summary>
@@ -290,7 +326,13 @@ public class OverallStepCounter : MonoBehaviour
         int gen = sessionGen;
 
         // Fast path: overallStepsBeforeToday already settled — one query per poll.
-        if (beforeTodaySettled) { queryInFlight = true; QueryTodayAndUpdate(gen); return; }
+        if (beforeTodaySettled)
+        {
+            queryInFlight     = true;
+            queryDispatchTime = Time.realtimeSinceStartup;
+            QueryTodayAndUpdate(gen);
+            return;
+        }
 
         // First-time path: compute overallStepsBeforeToday then settle.
         DateTime lastSave = DateTime.Parse(stepData.lastSaveTime).Date;
@@ -303,7 +345,8 @@ public class OverallStepCounter : MonoBehaviour
                 ? stepData.numberOfSteps - GetEstimatedTodayStepsFromDisk()
                 : 0;
             beforeTodaySettled = true;
-            queryInFlight = true;
+            queryInFlight     = true;
+            queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
         }
         else if (days == 1)
@@ -312,7 +355,8 @@ public class OverallStepCounter : MonoBehaviour
             savedDailyBase          = 0;
             overallStepsBeforeToday = stepData.numberOfSteps;
             beforeTodaySettled      = true;
-            queryInFlight = true;
+            queryInFlight     = true;
+            queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
         }
         else if (days <= 10)
@@ -323,7 +367,8 @@ public class OverallStepCounter : MonoBehaviour
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = snapshot + range;
                 beforeTodaySettled      = true;
-                queryInFlight = true;
+                queryInFlight     = true;
+                queryDispatchTime = Time.realtimeSinceStartup;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -334,7 +379,8 @@ public class OverallStepCounter : MonoBehaviour
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = range;
                 beforeTodaySettled      = true;
-                queryInFlight = true;
+                queryInFlight     = true;
+                queryDispatchTime = Time.realtimeSinceStartup;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -390,16 +436,32 @@ public class OverallStepCounter : MonoBehaviour
             // Daily = savedDailyBase (from disk/cloud) + steps since app opened today.
             int daily = CalcDailySteps(deviceNow);
 
-            int delta = Math.Abs(overallSteps - prev);
-            if (delta >= stepChangeThreshold)
+            int overallDelta = Math.Abs(overallSteps - prev);
+            int dailyDelta   = Math.Abs(daily - stepData.dailySteps);
+
+            // Fire whenever overall OR daily changed meaningfully.
+            // Previously only overall was checked — daily could change
+            // without triggering a UI update.
+            if (overallDelta >= stepChangeThreshold || dailyDelta >= stepChangeThreshold)
+            {
+                if (debugStepQueries)
+                    Debug.Log($"[Steps] Firing update — overall: {prev}→{overallSteps} " +
+                              $"(Δ{overallDelta}), daily: {stepData.dailySteps}→{daily} (Δ{dailyDelta})");
                 onStepsUpdated?.Invoke(overallSteps, daily);
-            else if (delta > 0 && debugStepQueries)
-                Debug.Log($"[Steps] Delta {delta} below threshold — suppressed.");
+            }
+            else if ((overallDelta > 0 || dailyDelta > 0) && debugStepQueries)
+                Debug.Log($"[Steps] Change below threshold — suppressed. overallΔ={overallDelta}, dailyΔ={dailyDelta}");
 
             stepData.dailySteps = daily;
             SaveStepData(deviceNow, gen);
         }).Execute();
     }
+
+    // Max seconds to wait for a StepCounterRequest before force-clearing queryInFlight.
+    // If the device sensor is slow or permission was just granted, this ensures the
+    // counter recovers rather than staying at 0 forever.
+    private const float QueryTimeout = 5f;
+    private float queryDispatchTime = 0f;
 
     private IEnumerator RefreshLoop()
     {
@@ -407,6 +469,17 @@ public class OverallStepCounter : MonoBehaviour
         while (true)
         {
             yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval));
+
+            // Watchdog: if a query has been in-flight longer than QueryTimeout,
+            // the callback likely never fired (permission denied, sensor unavailable).
+            // Force-clear so the next tick can try again.
+            if (queryInFlight && (Time.realtimeSinceStartup - queryDispatchTime) > QueryTimeout)
+            {
+                Debug.LogWarning("[StepCounter] Query timed out — clearing queryInFlight. " +
+                    "Check ACTIVITY_RECOGNITION permission is granted.");
+                queryInFlight = false;
+            }
+
             GetOverallSteps();
         }
     }
@@ -589,9 +662,27 @@ public class OverallStepCounter : MonoBehaviour
         {
             Debug.LogError($"[CLOUD] Load failed: {e.Message}");
             waitingForCloudData = false;
-            cloudLoaded = false;
-            if (stepData != null) { onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
-            else LoadStepData();
+            cloudLoaded         = false;
+
+            // Start() returned early handing control to FinalizeCloudLoad.
+            // Since cloud failed, FinalizeCloudLoad never ran and the refresh
+            // loop was never started. Start it now as the fallback.
+            if (stepData != null)
+            {
+                onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+                onLoaded?.Invoke();
+            }
+            else
+            {
+                LoadStepData();
+            }
+
+            // Ensure the loop is running regardless of which fallback path ran.
+            if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
+            {
+                Debug.Log("[CLOUD] Starting RefreshLoop after cloud load failure.");
+                refreshCoroutine = StartCoroutine(RefreshLoop());
+            }
         }
     }
 

@@ -8,47 +8,32 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
     class PlayerAccountsDemo : MonoBehaviour
     {
+        [SerializeField] TMP_Text m_StatusText;
+        [SerializeField] GameObject m_SignOut;
+        [SerializeField] GameObject m_SignIn;
 
-        [SerializeField]
-        TMP_Text m_StatusText;
-        [SerializeField]
-        GameObject m_SignOut;
-        [SerializeField]
-        GameObject m_SignIn;
-
-
-        string m_ExternalIds;
         private bool _isSigningIn = false;
-
+        private string m_ExternalIds = "";
         private async void Awake()
         {
             await UnityServices.InitializeAsync();
-            PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
-            SetupEvents();
-            //UpdateUI();
-            // Check if already signed in on game reopen
+
+            SetupAuthEvents();
+
+            PlayerAccountService.Instance.SignedIn += OnPlayerAccountServiceSignedIn;
+
+            // If the player was already signed in from a previous session
+            // (Unity persists sessions across launches), trigger the post-signin
+            // flow immediately so OverallStepCounter loads cloud data.
             if (AuthenticationService.Instance.IsSignedIn)
             {
-                Debug.Log("Already signed in. Updating UI.");
+                Debug.Log("[Auth] Already signed in on launch — triggering cloud load.");
                 m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-                UpdateUI();
+                OnFullySignedIn();
             }
-            else
-            {
-                Debug.Log("Not signed in yet. Waiting for PlayerAccountService.");
-                PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
-                UpdateUI();
-            }
-        }
 
-        private void OnPlayerAccountSignedIn()
-        {
-            if (!_isSigningIn && !AuthenticationService.Instance.IsSignedIn)
-            {
-                SignInWithUnity();
-            }
+            UpdateUI();
         }
-
         public async void StartSignInAsync()
         {
             if (_isSigningIn) return;
@@ -57,21 +42,17 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             try
             {
                 if (!PlayerAccountService.Instance.IsSignedIn)
-                {
                     await PlayerAccountService.Instance.StartSignInAsync();
-                    Debug.Log("PlayerAccountService signed in.");
-                    // OnPlayerAccountSignedIn will be called by the event
-                }
-                if (PlayerAccountService.Instance.IsSignedIn && !AuthenticationService.Instance.IsSignedIn)
+
+                if (PlayerAccountService.Instance.IsSignedIn &&
+                    !AuthenticationService.Instance.IsSignedIn)
                 {
-                    Debug.Log("Signing in with Unity using access token...");
-                    SignInWithUnity(); // Use access token to authenticate
+                    await SignInWithUnity();
                 }
             }
             catch (RequestFailedException ex)
             {
                 Debug.LogException(ex);
-                SetException(ex);
             }
             finally
             {
@@ -80,14 +61,54 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             }
         }
 
+
+        private void OnPlayerAccountServiceSignedIn()
+        {
+            if (!_isSigningIn && !AuthenticationService.Instance.IsSignedIn)
+                _ = SignInWithUnityAsync();
+        }
+
+        private async System.Threading.Tasks.Task SignInWithUnityAsync()
+        {
+            _isSigningIn = true;
+            try { await SignInWithUnity(); }
+            catch (RequestFailedException ex) { Debug.LogException(ex); }
+            finally { _isSigningIn = false; UpdateUI(); }
+        }
+
+        private async System.Threading.Tasks.Task SignInWithUnity()
+        {
+            if (AuthenticationService.Instance.IsSignedIn) return;
+
+            string accessToken = PlayerAccountService.Instance.AccessToken;
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                Debug.LogWarning("[Auth] No access token available.");
+                return;
+            }
+
+            await AuthenticationService.Instance.SignInWithUnityAsync(accessToken);
+            Debug.Log("[Auth] Signed in with Unity.");
+            m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
+        }
+
+
         public void SignOut()
         {
-            AuthenticationService.Instance.SignOut();
-
-            PlayerAccountService.Instance.SignOut();
-            Debug.Log("Signed out of Player Accounts and Authentication Service");
-
-            UpdateUI();
+            LogOutManager logoutManager = FindObjectOfType<LogOutManager>();
+            if (logoutManager != null)
+            {
+                logoutManager.LogoutAndRestart();
+            }
+            else
+            {
+                // Fallback if LogOutManager is not in the scene
+                Debug.LogWarning("[Auth] LogOutManager not found — doing bare sign-out. " +
+                    "Add LogOutManager to the scene for a proper wipe.");
+                AuthenticationService.Instance.SignOut();
+                PlayerAccountService.Instance.SignOut();
+                UpdateUI();
+            }
         }
 
         public void OpenAccountPortal()
@@ -95,143 +116,108 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             Application.OpenURL(PlayerAccountService.Instance.AccountPortalUrl);
         }
 
-        async void SignInWithUnity()
+   
+        private void OnFullySignedIn()
         {
-            if (_isSigningIn || AuthenticationService.Instance.IsSignedIn)
-                return;
+            Debug.Log("[Auth] Player fully signed in — notifying systems.");
 
-            _isSigningIn = true;
+            
+            PlayerPrefs.SetInt("PlayerSignedIn", 1);
+            PlayerPrefs.Save();
 
-            try
+            OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+            if (stepCounter != null && !stepCounter.cloudLoaded)
             {
-                var accessToken = PlayerAccountService.Instance.AccessToken;
-                if (!string.IsNullOrEmpty(accessToken))
-                {
-                    await AuthenticationService.Instance.SignInWithUnityAsync(accessToken);
-                    Debug.Log("Successfully signed in with Unity.");
-                    m_ExternalIds = GetExternalIds(AuthenticationService.Instance.PlayerInfo);
-                    UpdateUI();
-                }
-                else
-                {
-                    Debug.LogWarning("No access token available for Unity sign-in.");
-                }
+                Debug.Log("[Auth] Triggering step data cloud load.");
+                _ = stepCounter.LoadStepDataFromCloud();
             }
-            catch (RequestFailedException ex)
+
+            PlayerPrefsCloudSyncButton syncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
+            if (syncButton != null)
             {
-                Debug.LogException(ex);
+                Debug.Log("[Auth] Triggering non-step cloud load.");
+                syncButton.LoadFromCloud();
             }
-            finally
+            PlayerData playerData = FindObjectOfType<PlayerData>();
+            if (playerData != null)
             {
-                _isSigningIn = false;
+                Debug.Log("[Auth] Triggering player data cloud load.");
+                playerData.LoadPlayerDataFromCloud();
             }
+
+            UpdateUI();
         }
 
-        void UpdateUI()
-        {
-            // var statusBuilder = new StringBuilder();
 
-            // if (AuthenticationService.Instance.IsSignedIn)
-            // {
-            //     m_SignOut.SetActive(true);
-            //     m_SignIn.SetActive(false);
-            //     statusBuilder.AppendLine("Signed in");
-            //     statusBuilder.AppendLine(GetPlayerInfoText());
-            // }
-            // else
-            // {
-            //     m_SignOut.SetActive(false);
-            //     m_SignIn.SetActive(true);
-            //     statusBuilder.AppendLine("Not signed in");
-            // }
-
-            // m_StatusText.text = statusBuilder.ToString();
-            // Debug.Log("UI Updated: " + statusBuilder.ToString());
-            if (m_StatusText == null || m_SignOut == null || m_SignIn == null)
-            {
-                Debug.LogWarning("UI references are missing!");
-                return;
-            }
-            StringBuilder statusBuilder = new();
-
-            bool playerSignedIn = AuthenticationService.Instance.IsSignedIn;
-            Debug.Log("UpdateUI() called. Auth IsSignedIn: " + playerSignedIn);
-
-            if (playerSignedIn)
-            {
-                m_SignOut.SetActive(true);
-                m_SignIn.SetActive(false);
-                statusBuilder.AppendLine("Signed in");
-                statusBuilder.AppendLine(GetPlayerInfoText());
-            }
-            else
-            {
-                m_SignOut.SetActive(false);
-                m_SignIn.SetActive(true);
-                statusBuilder.AppendLine("Not signed in");
-            }
-
-            m_StatusText.text = statusBuilder.ToString();
-        }
-
-        string GetExternalIds(PlayerInfo playerInfo)
-        {
-            if (playerInfo.Identities == null)
-            {
-                return "None";
-            }
-
-            var sb = new StringBuilder();
-            foreach (var id in playerInfo.Identities)
-            {
-                sb.Append(" " + id.TypeId);
-            }
-
-            return sb.ToString();
-        }
-
-        string GetPlayerInfoText()
-        {
-            return $"ExternalIds: <b>{m_ExternalIds}</b>";
-        }
-
-        void SetException(Exception ex)
-        {
-            // m_ExceptionText.text = ex != null ? $"{ex.GetType().Name}: {ex.Message}" : "";
-        }
-        void SetupEvents()
+        private void SetupAuthEvents()
         {
             AuthenticationService.Instance.SignedIn += () =>
             {
-                // Shows how to get a playerID
-                Debug.Log($"PlayerID: {AuthenticationService.Instance.PlayerId}");
-
-                // Shows how to get an access token
-                Debug.Log($"Access Token: {AuthenticationService.Instance.AccessToken}");
-
+                Debug.Log($"[Auth] SignedIn — PlayerID: {AuthenticationService.Instance.PlayerId}");
+                // Trigger the full post-signin flow when AuthenticationService confirms sign-in.
+                // This covers both the explicit sign-in path and session restoration on relaunch.
+                OnFullySignedIn();
             };
 
             AuthenticationService.Instance.SignInFailed += (err) =>
             {
-                Debug.LogError(err);
+                Debug.LogError($"[Auth] Sign-in failed: {err}");
+                UpdateUI();
             };
 
             AuthenticationService.Instance.SignedOut += () =>
             {
-                Debug.Log("Player signed out.");
+                Debug.Log("[Auth] Signed out.");
+                PlayerPrefs.DeleteKey("PlayerSignedIn");
+                PlayerPrefs.Save();
+                UpdateUI();
             };
 
             AuthenticationService.Instance.Expired += () =>
-              {
-                  Debug.Log("Player session could not be refreshed and expired.");
-              };
+            {
+                Debug.LogWarning("[Auth] Session expired.");
+                PlayerPrefs.DeleteKey("PlayerSignedIn");
+                PlayerPrefs.Save();
+                UpdateUI();
+            };
         }
 
-        // void OnApplicationQuit()
-        // {
-        //     AuthenticationService.Instance.SignOut();
-        //     Debug.Log("Signed out on application quit.");
-        // }
-    }
+        // ─────────────────────────────────────────────────────────
+        //  UI
+        // ─────────────────────────────────────────────────────────
 
+        private void UpdateUI()
+        {
+            if (m_StatusText == null || m_SignOut == null || m_SignIn == null)
+            {
+                Debug.LogWarning("[Auth] UI references missing.");
+                return;
+            }
+
+            bool signedIn = AuthenticationService.Instance.IsSignedIn;
+            Debug.Log($"[Auth] UpdateUI — IsSignedIn: {signedIn}");
+
+            m_SignOut.SetActive(signedIn);
+            m_SignIn.SetActive(!signedIn);
+
+            var sb = new StringBuilder();
+            sb.AppendLine(signedIn ? "Signed in" : "Not signed in");
+            if (signedIn) sb.AppendLine(GetPlayerInfoText());
+            m_StatusText.text = sb.ToString();
+        }
+
+
+
+        private string GetExternalIds(PlayerInfo playerInfo)
+        {
+            if (playerInfo?.Identities == null) return "None";
+            var sb = new StringBuilder();
+            foreach (var id in playerInfo.Identities)
+                sb.Append(" " + id.TypeId);
+            return sb.ToString();
+        }
+
+        private string GetPlayerInfoText() =>
+            $"ExternalIds: <b>{m_ExternalIds}</b>";
+    }
 }

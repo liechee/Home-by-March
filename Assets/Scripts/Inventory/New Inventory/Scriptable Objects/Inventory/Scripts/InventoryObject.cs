@@ -22,20 +22,10 @@ public class InventoryObject : ScriptableObject
     public InterfaceType type;
     public Inventory Container;
 
-    /// <summary>
-    /// Fired after cloud data is applied to Container.Slots in memory.
-    /// Any UI component that displays inventory data (progress bars, slot panels)
-    /// should subscribe to this and refresh itself when it fires — this solves the
-    /// "correct after scene change but wrong on first load" bug, because the cloud
-    /// load is async and completes after UI Start() methods have already run.
-    /// </summary>
     public static event Action onInventoryLoaded;
 
     public InventorySlot[] GetSlots => Container.Slots;
 
-    // ─────────────────────────────────────────────────────────
-    //  Inventory Operations
-    // ─────────────────────────────────────────────────────────
 
     public bool AddItem(Item _item, int _amount)
     {
@@ -91,10 +81,6 @@ public class InventoryObject : ScriptableObject
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Local Save / Load  (binary file)
-    // ─────────────────────────────────────────────────────────
-
     [ContextMenu("Save")]
     public void Save()
     {
@@ -124,10 +110,6 @@ public class InventoryObject : ScriptableObject
     [ContextMenu("Clear")]
     public void Clear() => Container.Clear();
 
-    // ─────────────────────────────────────────────────────────
-    //  Cloud Save
-    // ─────────────────────────────────────────────────────────
-
     public async Task SaveInventoryToCloud(string fileName)
     {
         // Skip if empty so we don't overwrite cloud data with a blank inventory
@@ -144,10 +126,6 @@ public class InventoryObject : ScriptableObject
         await CloudSaver.SaveDataToCloud(fileName, json);
         Debug.Log($"[Inventory] Saved '{name}' to cloud as '{fileName}'.");
     }
-
-    // ─────────────────────────────────────────────────────────
-    //  Cloud Load
-    // ─────────────────────────────────────────────────────────
 
     public async Task LoadInventoryFromCloud(string fileName)
     {
@@ -189,16 +167,9 @@ public class InventoryObject : ScriptableObject
             Debug.LogWarning($"[Inventory] Slot count mismatch for '{fileName}': " +
                              $"cloud={loaded.Slots.Length}, current={GetSlots.Length}. Migrated {match} slots.");
 
-        // Persist the cloud data to the local binary file so Load() on next
-        // app open restores from the correct state without needing a cloud fetch.
         Save();
 
         Debug.Log($"[Inventory] Loaded '{fileName}' from cloud and applied to '{name}'.");
-
-        // Notify all UI subscribers (progress bars, slot panels) that inventory
-        // data has changed. This solves the "shows correctly only after scene change"
-        // bug — subscribers refresh immediately when cloud data arrives, not just
-        // on scene load.
         onInventoryLoaded?.Invoke();
     }
 }

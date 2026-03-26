@@ -9,27 +9,15 @@ public class PlayerPrefsData
 {
     public List<string> keys = new();
     public List<string> values = new();
-    public List<string> types = new(); // "int", "float", "string"
+    public List<string> types = new(); 
 }
 
 public static class PlayerPrefsCloudSync
 {
     private const string CloudKey = "AllPlayerPrefsBackup";
 
-    /// <summary>
-    /// Fired after PlayerPrefs have been successfully written from cloud data.
-    /// Subscribe to this in any UI that reads PlayerPrefs on startup (e.g. StoryProgressBar)
-    /// so it refreshes when cloud data arrives rather than waiting for a scene reload.
-    /// </summary>
     public static event Action onPlayerPrefsLoaded;
 
-    /// <summary>
-    /// Explicit type map — each key must declare its type.
-    /// This avoids the type-detection bug where PlayerPrefs.GetInt returns 0
-    /// for float/string keys, causing all values to be saved as "0" with type "int".
-    ///
-    /// Add keys here as ("KeyName", "int"/"float"/"string").
-    /// </summary>
     private static readonly List<(string key, string type)> TrackedKeys = new()
     {
         // Rewards
@@ -57,15 +45,8 @@ public static class PlayerPrefsCloudSync
         ("StoryCompleted_1", "int"),
         ("StoryCompleted_2", "int"),
         ("StoryCompleted_3", "int"),
-
-        // Add more keys here as needed:
-        // ("SomeFloatKey",  "float"),
-        // ("SomeStringKey", "string"),
     };
 
-    // ─────────────────────────────────────────────────────────
-    //  Save
-    // ─────────────────────────────────────────────────────────
 
     public static async Task SaveAllToCloud()
     {
@@ -129,9 +110,6 @@ public static class PlayerPrefsCloudSync
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Load
-    // ─────────────────────────────────────────────────────────
 
     public static async Task LoadAllFromCloud()
     {
@@ -209,10 +187,6 @@ public static class PlayerPrefsCloudSync
             Debug.LogError("[PlayerPrefsCloudSync] LoadAllFromCloud failed: " + e);
         }
     }
-
-    // ─────────────────────────────────────────────────────────
-    //  Guard
-    // ─────────────────────────────────────────────────────────
 
     private static bool IsSignedIn() =>
         Unity.Services.Core.UnityServices.State ==

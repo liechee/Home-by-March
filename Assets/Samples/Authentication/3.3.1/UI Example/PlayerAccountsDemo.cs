@@ -22,9 +22,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             PlayerAccountService.Instance.SignedIn += OnPlayerAccountServiceSignedIn;
 
-            // If the player was already signed in from a previous session
-            // (Unity persists sessions across launches), trigger the post-signin
-            // flow immediately so OverallStepCounter loads cloud data.
             if (AuthenticationService.Instance.IsSignedIn)
             {
                 Debug.Log("[Auth] Already signed in on launch — triggering cloud load.");
@@ -154,8 +151,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             AuthenticationService.Instance.SignedIn += () =>
             {
                 Debug.Log($"[Auth] SignedIn — PlayerID: {AuthenticationService.Instance.PlayerId}");
-                // Trigger the full post-signin flow when AuthenticationService confirms sign-in.
-                // This covers both the explicit sign-in path and session restoration on relaunch.
                 OnFullySignedIn();
             };
 
@@ -182,9 +177,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             };
         }
 
-        // ─────────────────────────────────────────────────────────
-        //  UI
-        // ─────────────────────────────────────────────────────────
 
         private void UpdateUI()
         {

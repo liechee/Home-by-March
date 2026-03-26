@@ -34,18 +34,9 @@ public class PlayerData : MonoBehaviour
     public PlayerDataSaver data;
     public Player playerAttributes;
 
-    /// <summary>
-    /// Set true by LogOutManager before the wipe begins.
-    /// Blocks SavePlayerDataToCloud so wiped data is never
-    /// re-uploaded during the logout sequence.
-    /// </summary>
     [HideInInspector] public bool isLoggingOut = false;
 
     private string playerDataJsonFilePath;
-
-    // ─────────────────────────────────────────────────────────
-    //  Defaults
-    // ─────────────────────────────────────────────────────────
 
     public PlayerData()
     {
@@ -59,10 +50,6 @@ public class PlayerData : MonoBehaviour
         movementSpeed = 6;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Lifecycle
-    // ─────────────────────────────────────────────────────────
-
     void Awake()
     {
         playerDataJsonFilePath = Application.persistentDataPath + "/playerData.json";
@@ -72,8 +59,6 @@ public class PlayerData : MonoBehaviour
 
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            // Preserve the player name across logout so the UI can show it,
-            // but reset all gameplay stats to Level 1 defaults.
             string savedName = playerName;
             bool isNew = string.IsNullOrEmpty(savedName) || savedName == "New Player";
 
@@ -91,9 +76,6 @@ public class PlayerData : MonoBehaviour
 
     public void OnApplicationClose() => SavePlayerDataAndSyncCloud();
 
-    // ─────────────────────────────────────────────────────────
-    //  Stats helpers
-    // ─────────────────────────────────────────────────────────
 
     public void UpdateCurrentStats()
     {
@@ -147,16 +129,10 @@ public class PlayerData : MonoBehaviour
         lastSavedLevel = level;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Local Save / Load
-    // ─────────────────────────────────────────────────────────
-
     public void SavePlayerData()
     {
         if (isLoggingOut) return;
 
-        // Always rebuild data from live fields before writing.
-        // This ensures cloud and local saves are never stale.
         data = BuildSaveData();
 
         string json = JsonUtility.ToJson(data);
@@ -182,18 +158,12 @@ public class PlayerData : MonoBehaviour
         Debug.Log($"[PlayerData] Loaded from disk — name='{playerName}', level={level}");
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Cloud Save / Load
-    // ─────────────────────────────────────────────────────────
-
     public async Task SavePlayerDataToCloud()
     {
         if (isLoggingOut) return;
         if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (!AuthenticationService.Instance.IsSignedIn) return;
 
-        // Always rebuild from live fields so cloud receives current state,
-        // not whatever data was last written by SavePlayerData().
         PlayerDataSaver snapshot = BuildSaveData();
         await CloudSaver.SaveDataToCloud("playerData", snapshot);
 
@@ -221,8 +191,6 @@ public class PlayerData : MonoBehaviour
                 return;
             }
 
-            // Cloud load is authoritative for this account/session.
-            // Never add local+cloud gold here, otherwise repeated loads can duplicate money.
             ApplySaveData(loaded);
 
             // Persist authoritative cloud result locally so both stores align.
@@ -248,15 +216,6 @@ public class PlayerData : MonoBehaviour
         _ = SavePlayerDataToCloud();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Helpers
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Builds a PlayerDataSaver snapshot from the current live field values.
-    /// Always call this before saving to cloud or disk — never send the cached
-    /// `data` field directly, as it may be stale from a previous save cycle.
-    /// </summary>
     private PlayerDataSaver BuildSaveData()
     {
         return new PlayerDataSaver
@@ -273,10 +232,6 @@ public class PlayerData : MonoBehaviour
         };
     }
 
-    /// <summary>
-    /// Applies a PlayerDataSaver to the live fields and refreshes computed stats.
-    /// Single entry point so cloud load and disk load use identical logic.
-    /// </summary>
     private void ApplySaveData(PlayerDataSaver d)
     {
         playerName = d.playerName;
@@ -292,6 +247,5 @@ public class PlayerData : MonoBehaviour
         UpdateCurrentStats();
     }
 
-    // Kept for external callers that still use SetPlayerStats
     public void SetPlayerStats(PlayerDataSaver d) => ApplySaveData(d);
 }

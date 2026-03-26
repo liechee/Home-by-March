@@ -1,20 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Displays story progress based on ShardCollected_N PlayerPrefs keys.
-///
-/// WHY THE EVENT SUBSCRIPTIONS EXIST:
-///   UpdateProgressBar() reads from PlayerPrefs. On first launch, PlayerPrefs
-///   are loaded from cloud asynchronously AFTER all Start() calls have run.
-///   Calling UpdateProgressBar() only in Start() always shows stale/local values
-///   on the first scene — the correct values appear only after a scene reload
-///   because Start() runs again with the now-loaded cloud data.
-///
-///   Fix: subscribe to PlayerPrefsCloudSync.onPlayerPrefsLoaded so the bar
-///   refreshes the moment cloud PlayerPrefs arrive, regardless of which scene
-///   is active or how many times the scene has been loaded.
-/// </summary>
 public class StoryProgressBar : MonoBehaviour
 {
     [Header("UI Elements")]
@@ -28,14 +14,9 @@ public class StoryProgressBar : MonoBehaviour
     [Header("Story Settings")]
     public int totalSubplots = 9;
 
-    // ─────────────────────────────────────────────────────────
-    //  Lifecycle
-    // ─────────────────────────────────────────────────────────
 
     void OnEnable()
     {
-        // Subscribe whenever this object becomes active so the bar always
-        // reflects the latest data even if the object was disabled and re-enabled.
         PlayerPrefsCloudSync.onPlayerPrefsLoaded += UpdateProgressBar;
     }
 
@@ -46,14 +27,8 @@ public class StoryProgressBar : MonoBehaviour
 
     void Start()
     {
-        // Show whatever is in PlayerPrefs right now (may be local/stale on first open).
-        // onPlayerPrefsLoaded will call UpdateProgressBar again once cloud data arrives.
         UpdateProgressBar();
     }
-
-    // ─────────────────────────────────────────────────────────
-    //  Progress Bar Update
-    // ─────────────────────────────────────────────────────────
 
     public void UpdateProgressBar()
     {

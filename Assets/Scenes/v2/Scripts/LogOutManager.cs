@@ -7,291 +7,159 @@ using System.IO;
 using System.Threading.Tasks;
 using Unity.Services.CloudSave;
 using System;
-using UnityEngine.InputSystem;
-using Unity.VisualScripting;
-using Repforge.StepCounterPro;
 
 public class LogOutManager : MonoBehaviour
 {
     [Header("UI")]
     [SerializeField] private GameObject loadingPanel;
-    private OverallStepCounter stepCounter;
-    private const string DailyStepOffsetKey = "DailyStepOffset";
-    private const string OverallStepOffsetKey = "OverallStepOffset";
-
 
     public async void LogoutAndRestart()
     {
-        Debug.Log("Starting logout process...");
+        Debug.Log("[LOGOUT] ── Starting logout ─────────────────────────────────────");
+
+        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        if (stepCounter != null)
+        {
+            stepCounter.isLoggingOut = true;
+            Debug.Log("[LOGOUT] isLoggingOut set — all saves blocked.");
+        }
+
+        // Disable the sync button so it cannot fire SaveToCloud mid-wipe
+        PlayerPrefsCloudSyncButton syncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
+        if (syncButton != null) syncButton.enabled = false;
 
         if (UnityServices.State != ServicesInitializationState.Initialized)
-        {
             await UnityServices.InitializeAsync();
-        }
 
-        // 1. Save offsets BEFORE destroying data
-        SaveStepOffsets(); // 🟩 Moved to top
-
-        // 2. Sign out and delete cloud
         if (AuthenticationService.Instance.IsSignedIn)
         {
-            Debug.Log("Signing out and deleting cloud data...");
+            Debug.Log("[LOGOUT] Deleting cloud data...");
             await DeleteAllCloudSaveData();
             AuthenticationService.Instance.SignOut();
-            Debug.Log("Signed out completely.");
+            Debug.Log("[LOGOUT] Signed out.");
         }
 
-        // 3. Nuclear wipe
-        NuclearDataWipe();
+        NuclearDataWipe(stepCounter);
 
-        // 4. Set logout flag
         PlayerPrefs.SetInt("HasLoggedOut", 1);
-        // Prevent cloud or local restore of previous step data until user signs in again
         PlayerPrefs.SetInt("SuppressCloudRestore", 1);
-        // Clear CloudRestored so subsequent startups won't think a cloud restore occurred
         PlayerPrefs.DeleteKey("CloudRestored");
-        // Clear HasEverSignedIn so new player starts fresh (not restoring old player's local data)
         PlayerPrefs.DeleteKey("HasEverSignedIn");
-        Debug.Log("[LOGOUT] Cleared HasEverSignedIn - new session will start fresh");
         PlayerPrefs.Save();
+        Debug.Log("[LOGOUT] Session flags set.");
 
-        // 5. UI + Restart
         if (loadingPanel != null) loadingPanel.SetActive(true);
-        Debug.Log("Complete data wipe finished. Restarting app...");
-        StartCoroutine(QuitAfterDelay(2f));
+        StartCoroutine(ReloadEntryScreen(2f));
     }
 
-
-    private void NuclearDataWipe()
+    private void NuclearDataWipe(OverallStepCounter stepCounter)
     {
+        if (stepCounter != null)
+        {
+            stepCounter.ResetStepDataCompletely();
+            Debug.Log("[LOGOUT] OverallStepCounter reset.");
+        }
 
-        // 1. Reset step counters FIRST (before deleting files)
-        ResetStepCounters();
+        foreach (UserLevel ul in FindObjectsOfType<UserLevel>())
+        {
+            ul.dailyStepCount   = 0;
+            ul.overallStepCount = 0;
+            ul.currentStepCount = 0;
+        }
 
-        // 2. Clear ALL PlayerPrefs
         PlayerPrefs.DeleteAll();
         PlayerPrefs.Save();
-        Debug.Log("PlayerPrefs deleted");
+        Debug.Log("[LOGOUT] PlayerPrefs cleared.");
 
-        // 3. Delete all files
         DeleteAllFiles();
-
-        // 4. Reset ScriptableObjects
         ResetScriptableObjects();
+        DestroyPersistentObjects(stepCounter);
 
-        // 5. Destroy game objects
-        DestroyGameObjects();
-
-        Debug.Log("Delete COMPLETE");
-    }
-
-    private void ResetStepCounters()
-    {
-        Debug.Log("Resetting step counters...");
-
-        try
-        {
-            // Find and reset OverallStepCounter
-            OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
-            if (stepCounter != null)
-            {
-                // Stop all coroutines that might save data
-                stepCounter.StopAllCoroutines();
-
-                // Reset fields to zero
-                stepCounter.overallSteps = 0;
-                stepCounter.overallStepsBeforeToday = 0;
-                stepCounter.stepData = null;
-
-                Debug.Log("OverallStepCounter reset");
-            }
-
-            // Find and reset UserLevel
-            UserLevel[] userLevels = FindObjectsOfType<UserLevel>();
-            foreach (UserLevel userLevel in userLevels)
-            {
-                if (userLevel != null)
-                {
-                    userLevel.dailyStepCount = 0;
-                    userLevel.overallStepCount = 0;
-                    userLevel.currentStepCount = 0;
-                    Debug.Log("UserLevel reset");
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"Error resetting step counters: {e.Message}");
-        }
+        Debug.Log("[LOGOUT] Nuclear wipe complete.");
     }
 
     private void DeleteAllFiles()
     {
-        string persistentPath = Application.persistentDataPath;
-        Debug.Log($"Deleting all files in: {persistentPath}");
+        string path = Application.persistentDataPath;
+        if (!Directory.Exists(path)) return;
 
-        try
+        foreach (string file in Directory.GetFiles(path, "*.*", SearchOption.AllDirectories))
         {
-            if (Directory.Exists(persistentPath))
+            try
             {
-                // Get all files
-                string[] allFiles = Directory.GetFiles(persistentPath, "*.*", SearchOption.AllDirectories);
-
-                foreach (string file in allFiles)
-                {
-                    try
-                    {
-                        File.SetAttributes(file, FileAttributes.Normal);
-                        File.Delete(file);
-                        Debug.Log($"Deleted: {Path.GetFileName(file)}");
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning($"Couldn't delete {Path.GetFileName(file)}: {e.Message}");
-
-                        // Try overwriting with empty content
-                        try
-                        {
-                            File.WriteAllText(file, "");
-                            File.Delete(file);
-                            Debug.Log($"Force deleted: {Path.GetFileName(file)}");
-                        }
-                        catch
-                        {
-                            Debug.LogError($"Failed to delete: {Path.GetFileName(file)}");
-                        }
-                    }
-                }
-
-                // Delete directories
-                string[] allDirs = Directory.GetDirectories(persistentPath, "*", SearchOption.AllDirectories);
-                foreach (string dir in allDirs)
-                {
-                    try
-                    {
-                        Directory.Delete(dir, true);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning($"Couldn't delete directory: {e.Message}");
-                    }
-                }
+                File.SetAttributes(file, FileAttributes.Normal);
+                File.Delete(file);
+                Debug.Log($"[LOGOUT] Deleted: {Path.GetFileName(file)}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[LOGOUT] Could not delete {Path.GetFileName(file)}: {e.Message}");
+                try { File.WriteAllText(file, ""); File.Delete(file); }
+                catch { Debug.LogError($"[LOGOUT] Force-delete failed: {Path.GetFileName(file)}"); }
             }
         }
-        catch (Exception e)
+
+        foreach (string dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
         {
-            Debug.LogError($"Error deleting files: {e.Message}");
+            try { Directory.Delete(dir, true); }
+            catch (Exception e) { Debug.LogWarning($"[LOGOUT] Could not delete dir: {e.Message}"); }
         }
     }
 
     private void ResetScriptableObjects()
     {
-        Debug.Log("Resetting ScriptableObjects...");
-
-        try
+        foreach (InventoryObject inv in Resources.FindObjectsOfTypeAll<InventoryObject>())
         {
-            // Reset InventoryObjects
-            InventoryObject[] inventoryObjects = Resources.FindObjectsOfTypeAll<InventoryObject>();
-            foreach (InventoryObject inventoryObj in inventoryObjects)
-            {
-                try
-                {
-                    inventoryObj.Container.Clear();
-                    Debug.Log($"Cleared: {inventoryObj.name}");
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogWarning($"Couldn't clear {inventoryObj.name}: {e.Message}");
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"Error resetting ScriptableObjects: {e.Message}");
+            try { inv.Container.Clear(); }
+            catch (Exception e) { Debug.LogWarning($"[LOGOUT] Could not clear {inv.name}: {e.Message}"); }
         }
     }
 
-    private void DestroyGameObjects()
+    private void DestroyPersistentObjects(OverallStepCounter stepCounter)
     {
-        Debug.Log("Destroying game objects...");
+        GameObject self           = gameObject;
+        GameObject stepCounterObj = stepCounter != null ? stepCounter.gameObject : null;
 
-        try
+        foreach (GameObject obj in FindObjectsOfType<GameObject>())
         {
-            GameObject thisGameObject = this.gameObject;
-            GameObject[] allObjects = FindObjectsOfType<GameObject>();
+            if (obj == null || obj == self || obj == stepCounterObj) continue;
+            if (obj.scene.name != "DontDestroyOnLoad") continue;
+            if (obj.name.Contains("EventSystem") || obj.name.Contains("AudioListener")) continue;
 
-            foreach (GameObject obj in allObjects)
+            try
             {
-                if (obj == null || obj == thisGameObject) continue;
-
-                if (obj.scene.name == "DontDestroyOnLoad" &&
-                    !obj.name.Contains("EventSystem") &&
-                    !obj.name.Contains("AudioListener"))
-                {
-                    try
-                    {
-                        Debug.Log($"Destroying: {obj.name}");
-                        DestroyImmediate(obj);
-                    }
-                    catch (System.Exception e)
-                    {
-                        Debug.LogWarning($"Error destroying {obj.name}: {e.Message}");
-                    }
-                }
+                Debug.Log($"[LOGOUT] Destroying: {obj.name}");
+                DestroyImmediate(obj);
             }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Error destroying objects: {e.Message}");
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[LOGOUT] Could not destroy {obj.name}: {e.Message}");
+            }
         }
     }
 
+    [Obsolete]
     private async Task DeleteAllCloudSaveData()
     {
         try
         {
-            var keysResult = await CloudSaveService.Instance.Data.RetrieveAllKeysAsync();
-
-            if (keysResult.Count > 0)
+            var keys = await CloudSaveService.Instance.Data.RetrieveAllKeysAsync();
+            foreach (var key in keys)
             {
-                foreach (var key in keysResult)
-                {
-                    await CloudSaveService.Instance.Data.ForceDeleteAsync(key);
-                    Debug.Log($"Cloud key deleted: {key}");
-                }
-                Debug.Log("All cloud data deleted");
+                await CloudSaveService.Instance.Data.ForceDeleteAsync(key);
+                Debug.Log($"[LOGOUT] Cloud key deleted: {key}");
             }
-            else
-            {
-                Debug.Log("No cloud data to delete");
-            }
+            Debug.Log(keys.Count > 0 ? "[LOGOUT] All cloud data deleted." : "[LOGOUT] No cloud data found.");
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"Error deleting cloud data: {e.Message}");
+            Debug.LogWarning($"[LOGOUT] Error deleting cloud data: {e.Message}");
         }
     }
-
-    private IEnumerator QuitAfterDelay(float seconds)
+    private IEnumerator ReloadEntryScreen(float delay)
     {
-        yield return new WaitForSeconds(seconds);
-        Debug.Log("Restarting to Entry Screen...");
+        yield return new WaitForSeconds(delay);
+        Debug.Log("[LOGOUT] ── Loading Entry Screen ──────────────────────────────");
         SceneManager.LoadScene("Entry Screen");
     }
-    void SaveStepOffsets()
-    {
-        StepCounterRequest dailyRequest = new StepCounterRequest();
-        dailyRequest.Since(DateTime.Today).OnQuerySuccess((stepCountToday) =>
-        {
-            PlayerPrefs.SetInt(DailyStepOffsetKey, stepCountToday);
-        }).Execute();
-
-        StepCounterRequest totalRequest = new StepCounterRequest();
-        totalRequest.Since(DateTime.Today.AddDays(-10)).OnQuerySuccess((stepCountTotal) =>
-        {
-            PlayerPrefs.SetInt(OverallStepOffsetKey, stepCountTotal);
-            PlayerPrefs.Save();
-        }).Execute();
-    }
-
 }

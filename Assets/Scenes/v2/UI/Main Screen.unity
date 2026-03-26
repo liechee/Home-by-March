@@ -5308,6 +5308,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 444e73ae44262624e88007c601d84d45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  refreshInterval: 2
+  stepChangeThreshold: 1
+  debugStepQueries: 0
+  diskSaveInterval: 10
   stepData:
     lastSaveTime: 
     registrationTime: 
@@ -5317,10 +5321,11 @@ MonoBehaviour:
     baselineSteps: 0
     version: 1.0
   overallSteps: 0
-  stepDataJsonFilePath: 
   overallStepsBeforeToday: 0
   cloudLoaded: 0
-  refreshInterval: 2
+  stepDataJsonFilePath: 
+  isLoggingOut: 0
+  initializingFreshData: 0
 --- !u!224 &507941527
 RectTransform:
   m_ObjectHideFlags: 0
@@ -13727,14 +13732,13 @@ MonoBehaviour:
   overallStepCountText: {fileID: 1471654332}
   percentageText: {fileID: 670725061}
   experienceBarImage: {fileID: 1639304528}
-  stepCountDemo: {fileID: 1088589300}
-  totalStepsForNextLevel: 0
+  userNameText: {fileID: 2041192496}
+  playerData: {fileID: 1088589307}
   currentStepCount: 0
   dailyStepCount: 0
   overallStepCount: 0
+  totalStepsForNextLevel: 0
   remainingStepsForNextLevel: 0
-  userNameText: {fileID: 2041192496}
-  playerData: {fileID: 1088589307}
 --- !u!1 &804733405
 GameObject:
   m_ObjectHideFlags: 0
@@ -38250,6 +38254,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dailyRewardsWindow: {fileID: 225072951}
+  inventory: {fileID: 11400000, guid: 43835e75255697f44b8c11400e3fd98a, type: 2}
+  inventory2: {fileID: 11400000, guid: ba391aef18194db419840aa8245becc2, type: 2}
 --- !u!222 &7632301638552686069
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,6 +14,17 @@ public class StoryProgressBar : MonoBehaviour
     [Header("Story Settings")]
     public int totalSubplots = 9;
 
+
+    void OnEnable()
+    {
+        PlayerPrefsCloudSync.onPlayerPrefsLoaded += UpdateProgressBar;
+    }
+
+    void OnDisable()
+    {
+        PlayerPrefsCloudSync.onPlayerPrefsLoaded -= UpdateProgressBar;
+    }
+
     void Start()
     {
         UpdateProgressBar();
@@ -31,22 +40,17 @@ public class StoryProgressBar : MonoBehaviour
                 collectedShards++;
         }
 
-        // Fill the progress bar
         float fillAmount = Mathf.Clamp01((float)collectedShards / totalSubplots);
+
         if (fillImage != null)
-        {
             fillImage.fillAmount = fillAmount;
-        }
 
-        // Activate stars based on shard count
         int starsUnlocked = collectedShards / 3;
-
         if (star1 != null) star1.SetActive(starsUnlocked >= 1);
         if (star2 != null) star2.SetActive(starsUnlocked >= 2);
         if (star3 != null) star3.SetActive(starsUnlocked >= 3);
 
-        Debug.Log($"[StoryProgressBar] Shards: {collectedShards}, Stars: {starsUnlocked}, Fill: {fillAmount * 100f}%");
+        Debug.Log($"[StoryProgressBar] Shards: {collectedShards}/{totalSubplots}, " +
+                  $"Stars: {starsUnlocked}, Fill: {fillAmount * 100f:F0}%");
     }
 }
-
-

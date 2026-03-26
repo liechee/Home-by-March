@@ -1,12 +1,9 @@
 using System;
 using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using Unity.Services.Core;
 using Unity.Services.Authentication;
 using System.Threading.Tasks;
-
 
 [System.Serializable]
 public class PlayerData : MonoBehaviour
@@ -14,13 +11,10 @@ public class PlayerData : MonoBehaviour
     public string playerName;
     public int level;
     public float health;
-
     public int attack;
     public int defense;
     public float cooldown;
-
     public float healthBuff;
-
     public int attackBuff;
     public int defenseBuff;
     public float cooldownBuff;
@@ -35,17 +29,17 @@ public class PlayerData : MonoBehaviour
     public float currentCooldown;
     public float currentMovementSpeed;
 
+    public int lastSavedLevel;
 
-    private string playerDataJsonFilePath;
     public PlayerDataSaver data;
-
     public Player playerAttributes;
 
-    public int lastSavedLevel;
+    [HideInInspector] public bool isLoggingOut = false;
+
+    private string playerDataJsonFilePath;
 
     public PlayerData()
     {
-        // Default values for a new player
         playerName = "New Player";
         level = 1;
         health = 100;
@@ -54,101 +48,46 @@ public class PlayerData : MonoBehaviour
         gold = 0;
         attackSpeed = 2;
         movementSpeed = 6;
-
     }
+
     void Awake()
     {
         playerDataJsonFilePath = Application.persistentDataPath + "/playerData.json";
-        Debug.Log($"[PlayerData] Awake called - Initial playerName from constructor: '{playerName}'");
-        //LoadPlayerData();
 
-        // Initialize lastSavedLevel to the current level if not already set
-        // if (lastSavedLevel == 0)
-        // {
-        //     lastSavedLevel = level;
-        // }
-        // // Load from file as fallback
-        // if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
-        // {
-        //     Debug.Log("Fresh logout detected. Skipping step data load.");
-        //     Reset();
-        // }
-        
-        // First, ALWAYS load saved player data (to preserve player name and other persistent stats)
         LoadPlayerData();
-        Debug.Log($"[PlayerData] After LoadPlayerData - playerName: '{playerName}'");
+        Debug.Log($"[PlayerData] Loaded — name='{playerName}', level={level}");
 
-        // If HasLoggedOut is set, reset gameplay stats but PRESERVE the player name
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
-            Debug.Log("Fresh logout detected. Resetting gameplay stats but preserving player name.");
-            string savedName = playerName; // Preserve the loaded name
-            
-            // If the saved name is still "New Player", this is a new player who needs to set their name
-            bool isNewPlayer = (savedName == "New Player" || string.IsNullOrEmpty(savedName));
-            Debug.Log($"[PlayerData] IsNewPlayer check: savedName='{savedName}', isNewPlayer={isNewPlayer}");
-            
-            // Reset player data to safe defaults so UI shows Level 1 after logout
+            string savedName = playerName;
+            bool isNew = string.IsNullOrEmpty(savedName) || savedName == "New Player";
+
             Reset();
-            playerName = savedName; // Restore the player name
-            Debug.Log($"[PlayerData] After Reset, restored playerName to: '{playerName}'");
-            
-            // If this is a truly new player, reset to default name so they're prompted to change it
-            if (isNewPlayer)
-            {
-                playerName = "New Player";
-                Debug.Log($"[PlayerData] New player detected - name set to 'New Player' for prompt");
-            }
-            
-            // Persist the reset player data locally so startup state is consistent
+            playerName = isNew ? "New Player" : savedName;
+
             SavePlayerData();
             UpdateCurrentStats();
             return;
         }
 
-        // Initialize lastSavedLevel to the current level if not already set
-        if (lastSavedLevel == 0)
-        {
-            lastSavedLevel = level;
-        }
-
-
+        if (lastSavedLevel == 0) lastSavedLevel = level;
         UpdateCurrentStats();
-
     }
+
+    public void OnApplicationClose() => SavePlayerDataAndSyncCloud();
+
 
     public void UpdateCurrentStats()
     {
-        // Update the current stats based on the base stats and buffs
         currentAttack = attack + attackBuff;
         currentDefense = defense + defenseBuff;
         currentHealth = health + healthBuff;
         currentCooldown = cooldown + cooldownBuff;
         currentMovementSpeed = movementSpeed + movementSpeedBuff;
-
-        // Log the updated stats for debugging purposes
-        Debug.Log("Current Stats Updated:");
-        Debug.Log(attack + attackBuff);
-        Debug.Log($"Current Attack: {currentAttack}, Current Defense: {currentDefense}, Current Health: {currentHealth}, Current Cooldown: {currentCooldown}, Current Movement Speed: {currentMovementSpeed}");
-    }
-    // void Update()
-    // {
-    //     attack += attackBuff;
-    // }
-
-
-
-    public void OnApplicationClose()
-    {
-        SavePlayerData();
     }
 
-    // Method to level up the player
     public void LevelUp()
     {
-        Debug.Log("Leveling up...");
-        Debug.Log("Current health: " + health);
-
         health = 100 + (10 * level);
         attack = 5 * level;
         defense = 3 * level;
@@ -156,145 +95,23 @@ public class PlayerData : MonoBehaviour
         cooldown = (float)Math.Round(level / 0.995f);
         movementSpeed = movementSpeed / 0.995f;
 
-        Debug.Log("New health: " + health);
-
-        // Call UpdateCurrentStats to update currentCooldown and other stats
         UpdateCurrentStats();
-
-        SavePlayerData();
+        SavePlayerDataAndSyncCloud();
     }
 
-
-    public void AddGold(int amount)
-    {
-        gold += amount;
-        SavePlayerData();
-    }
-
-    public void SubtractGold(int amount)
-    {
-        gold -= amount;
-        SavePlayerData();
-    }
-
-    public void GainGold()
-    {
-        AddGold(1000);
-    }
-
-
-    public void SavePlayerData()
-    {
-
-        data = new PlayerDataSaver();
-        data.playerName = playerName;
-        data.level = level;
-        data.health = health;
-        data.attack = attack;
-        data.defense = defense;
-        data.cooldown = cooldown;
-        data.movementSpeed = movementSpeed;
-        data.gold = gold;
-        data.attackSpeed = attackSpeed;
-
-
-        string playerDataJson = JsonUtility.ToJson(data);
-        System.IO.File.WriteAllText(playerDataJsonFilePath, playerDataJson);
-
-        Debug.Log($"[PlayerData] Saved player data: Name='{data.playerName}', Level={data.level}, Gold={data.gold}");
-        Debug.Log($"[PlayerData] Saved to: {playerDataJsonFilePath}");
-
-
-    }
-
-    public void LoadPlayerData()
-    {
-
-
-
- 
-        if (System.IO.File.Exists(playerDataJsonFilePath))
-        {
-            string playerDataJson = System.IO.File.ReadAllText(playerDataJsonFilePath);
-            data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
-
-            Debug.Log($"[PlayerData] Raw JSON loaded: {playerDataJson}");
-            Debug.Log($"[PlayerData] Parsed name: '{data.playerName}', level: {data.level}");
-
-            SetPlayerStats(data);
-
-            Debug.Log($"[PlayerData] Player data loaded - Name: '{playerName}', Level: {level}");
-
-
-        }
-
-    }
-
-    public async Task SavePlayerDataToCloud()
-    {
-
-        await CloudSaver.SaveDataToCloud("playerData", data);
-
-    }
-
-    public async Task LoadPlayerDataFromCloud()
-    {
-        // string playerDataJson = await CloudSaver.LoadDataFromCloud("playerData");
-        // data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
-        // Debug.Log(data.playerName);
-
-
-        // SetPlayerStats(data);
-        // SavePlayerData();
-        try
-        {
-            string playerDataJson = await CloudSaver.LoadDataFromCloud("playerData");
-
-            if (!string.IsNullOrEmpty(playerDataJson))
-            {
-                data = JsonUtility.FromJson<PlayerDataSaver>(playerDataJson);
-                SetPlayerStats(data);
-                SavePlayerData(); // Save locally after loading from cloud
-                Debug.Log("Cloud player data loaded successfully.");
-            }
-            else
-            {
-                Debug.LogWarning("No cloud data found. Falling back to local.");
-                LoadPlayerData(); // fallback to local
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Failed to load from cloud: {e.Message}. Falling back to local.");
-            LoadPlayerData(); // fallback
-        }
-
-    }
-
-    public void SetPlayerStats(PlayerDataSaver playerData)
-    {
-        playerName = playerData.playerName;
-        level = playerData.level;
-        health = playerData.health;
-        attack = playerData.attack;
-        defense = playerData.defense;
-        gold = playerData.gold;
-        attackSpeed = playerData.attackSpeed;
-        UpdateCurrentStats();
-
-        Debug.Log($"[PlayerData] SetPlayerStats called - Name set to: '{playerName}', Level: {level}");
-    }
+    public void AddGold(int amount) { gold += amount; SavePlayerDataAndSyncCloud(); }
+    public void SubtractGold(int amount) { gold -= amount; SavePlayerDataAndSyncCloud(); }
+    public void GainGold() => AddGold(1000);
 
     public void ChangePlayerName(string name)
     {
-        Debug.Log($"[PlayerData] ChangePlayerName called - Old name: '{playerName}', New name: '{name}'");
         playerName = name;
-        SavePlayerData();
-        Debug.Log($"[PlayerData] Name changed and saved. Current playerName field: '{playerName}'");
+        SavePlayerDataAndSyncCloud();
+        Debug.Log($"[PlayerData] Name changed to '{playerName}'.");
     }
+
     public void Reset()
     {
-        // Reset all relevant fields
         level = 1;
         health = 100;
         attack = 10;
@@ -303,7 +120,6 @@ public class PlayerData : MonoBehaviour
         attackSpeed = 2;
         movementSpeed = 6;
 
-        // Reset buffs
         healthBuff = 0;
         attackBuff = 0;
         defenseBuff = 0;
@@ -313,5 +129,123 @@ public class PlayerData : MonoBehaviour
         lastSavedLevel = level;
     }
 
+    public void SavePlayerData()
+    {
+        if (isLoggingOut) return;
 
+        data = BuildSaveData();
+
+        string json = JsonUtility.ToJson(data);
+        File.WriteAllText(playerDataJsonFilePath, json);
+
+        Debug.Log($"[PlayerData] Saved — name='{data.playerName}', level={data.level}, gold={data.gold}");
+    }
+
+    public void LoadPlayerData()
+    {
+        if (!File.Exists(playerDataJsonFilePath)) return;
+
+        string json = File.ReadAllText(playerDataJsonFilePath);
+        data = JsonUtility.FromJson<PlayerDataSaver>(json);
+
+        if (data == null)
+        {
+            Debug.LogWarning("[PlayerData] File exists but deserialized to null — skipping.");
+            return;
+        }
+
+        ApplySaveData(data);
+        Debug.Log($"[PlayerData] Loaded from disk — name='{playerName}', level={level}");
+    }
+
+    public async Task SavePlayerDataToCloud()
+    {
+        if (isLoggingOut) return;
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
+        if (!AuthenticationService.Instance.IsSignedIn) return;
+
+        PlayerDataSaver snapshot = BuildSaveData();
+        await CloudSaver.SaveDataToCloud("playerData", snapshot);
+
+        Debug.Log($"[PlayerData] Cloud saved — name='{snapshot.playerName}', level={snapshot.level}");
+    }
+
+    public async Task LoadPlayerDataFromCloud()
+    {
+        try
+        {
+            string json = await CloudSaver.LoadDataFromCloud("playerData");
+
+            if (string.IsNullOrEmpty(json))
+            {
+                Debug.LogWarning("[PlayerData] No cloud data found — falling back to local.");
+                LoadPlayerData();
+                return;
+            }
+
+            PlayerDataSaver loaded = JsonUtility.FromJson<PlayerDataSaver>(json);
+            if (loaded == null)
+            {
+                Debug.LogWarning("[PlayerData] Cloud JSON deserialized to null — falling back to local.");
+                LoadPlayerData();
+                return;
+            }
+
+            ApplySaveData(loaded);
+
+            // Persist authoritative cloud result locally so both stores align.
+            SavePlayerData();
+
+            Debug.Log($"[PlayerData] Cloud loaded — name='{playerName}', level={level}, gold={gold}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[PlayerData] Cloud load failed: {e.Message} — falling back to local.");
+            LoadPlayerData();
+        }
+    }
+
+    private void SavePlayerDataAndSyncCloud()
+    {
+        SavePlayerData();
+
+        if (isLoggingOut) return;
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
+        if (!AuthenticationService.Instance.IsSignedIn) return;
+
+        _ = SavePlayerDataToCloud();
+    }
+
+    private PlayerDataSaver BuildSaveData()
+    {
+        return new PlayerDataSaver
+        {
+            playerName = playerName,
+            level = level,
+            health = health,
+            attack = attack,
+            defense = defense,
+            cooldown = cooldown,
+            movementSpeed = movementSpeed,
+            gold = gold,
+            attackSpeed = attackSpeed
+        };
+    }
+
+    private void ApplySaveData(PlayerDataSaver d)
+    {
+        playerName = d.playerName;
+        level = d.level;
+        health = d.health;
+        attack = d.attack;
+        defense = d.defense;
+        cooldown = d.cooldown;
+        movementSpeed = d.movementSpeed;
+        gold = d.gold;
+        attackSpeed = d.attackSpeed;
+
+        UpdateCurrentStats();
+    }
+
+    public void SetPlayerStats(PlayerDataSaver d) => ApplySaveData(d);
 }

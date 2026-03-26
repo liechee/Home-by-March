@@ -1,152 +1,178 @@
 using UnityEngine;
 using System.Threading.Tasks;
-using Unity.VisualScripting;
-using System.IO;
 
 public class PlayerPrefsCloudSyncButton : MonoBehaviour
 {
-    private OverallStepCounter overallStepCounter;
-    private PlayerData playerData;
+    private OverallStepCounter                      overallStepCounter;
+    private PlayerData                              playerData;
     [SerializeField] CoppraGames.DailyRewardsWindow dailyRewardsWindow;
-    // [SerializeField] private DynamicInterface dynamicInterface;
-    // [SerializeField] private StaticInterface staticInterface;
-    private InventoryObject inventory;
-    private static PlayerPrefsCloudSyncButton instance;
+    [SerializeField] private InventoryObject        inventory;
+    [SerializeField] private InventoryObject        inventory2;
 
     void Awake()
     {
-        // if (instance != null && instance != this)
-        // {
-        //     Destroy(this.gameObject);
-        //     return;
-        // }
-        // instance = this;
-
-        // DontDestroyOnLoad(this.gameObject);
         overallStepCounter = FindObjectOfType<OverallStepCounter>();
-        if (overallStepCounter == null) Debug.LogWarning("OverallStepCounter not found!");
+        playerData         = FindObjectOfType<PlayerData>();
 
-        playerData = FindObjectOfType<PlayerData>();
-        if (playerData == null) Debug.LogWarning("PlayerData not found!");
-
-        //dailyRewardsWindow = FindObjectOfType<CoppraGames.DailyRewardsWindow>();
-        if (dailyRewardsWindow == null) Debug.LogWarning("DailyRewardsWindow not found!");
-
-        // // dynamicInterface = FindObjectOfType<DynamicInterface>();
-        // if (dynamicInterface == null) Debug.LogWarning("DynamicInterface not found!");
-
-        // // // staticInterface = FindObjectOfType<StaticInterface>();
-        // if (staticInterface == null) Debug.LogWarning("StaticInterface not found!");
-
-        //inventory = FindObjectOfType<InventoryObject>();  
-        if (inventory == null) Debug.LogWarning("Inventory not found!");
+        if (overallStepCounter == null) Debug.LogWarning("[CloudSync] OverallStepCounter not found!");
+        if (playerData         == null) Debug.LogWarning("[CloudSync] PlayerData not found!");
+        if (dailyRewardsWindow == null) Debug.LogWarning("[CloudSync] DailyRewardsWindow not found!");
+        if (inventory          == null) Debug.LogWarning("[CloudSync] Inventory not found!");
+        if (inventory2         == null) Debug.LogWarning("[CloudSync] Inventory2 not found!");
     }
+
+    async void Start()
+    {
+ 
+        await LoadNonStepDataFromCloud();
+    }
+
+
+    async void OnApplicationQuit()
+    {
+        if (!IsSafeToProceed("OnApplicationQuit")) return;
+        await SaveNonStepDataToCloud();
+    }
+
+    async void OnApplicationPause(bool isPaused)
+    {
+        if (!isPaused || !IsSafeToProceed("OnApplicationPause")) return;
+        await SaveNonStepDataToCloud();
+    }
+
 
     public async void SaveToCloud()
     {
-        // await PlayerPrefsCloudSync.SaveAllToCloud();
-        // await overallStepCounter.SaveStepDataToCloud();
-        // await playerData.SavePlayerDataToCloud();
-        // dailyRewardsWindow.SaveDailyQuestProgressToCloud();
-        // dynamicInterface.SaveInventoryToCloudButton();
-        // staticInterface.SaveInventoryToCloudButton();
-        Debug.Log("[CloudSync] Starting SaveToCloud...");
-        await PlayerPrefsCloudSync.SaveAllToCloud();
-        Debug.Log("[CloudSync] PlayerPrefs saved to cloud.");
+        if (!IsSafeToProceed("SaveToCloud")) return;
+
+        Debug.Log("[CloudSync] ── SaveToCloud ──────────────────────────────────");
+
+        // Step data: delegated to OverallStepCounter (owns its own state + guards)
         if (overallStepCounter != null)
         {
             await overallStepCounter.SaveStepDataToCloud();
-            Debug.Log("[CloudSync] Step data saved to cloud.");
+            Debug.Log("[CloudSync] Step data saved.");
         }
-        if (playerData != null)
-        {
-            await playerData.SavePlayerDataToCloud();
-            Debug.Log("[CloudSync] Player data saved to cloud.");
-        }
-        if (dailyRewardsWindow != null)
-        {
-            await dailyRewardsWindow.SaveDailyQuestProgressToCloud();
-            Debug.Log("[CloudSync] Daily quest progress saved to cloud.");
-        }
-        // if (dynamicInterface != null)
-        // {
-        //    await dynamicInterface.SaveInventoryToCloudButton();
-        //     Debug.Log("[CloudSync] Dynamic inventory saved to cloud.");
-        // }
-        // if (staticInterface != null)
-        // {
-        //   await staticInterface.SaveInventoryToCloudButton();
-        //     Debug.Log("[CloudSync] Static inventory saved to cloud.");
-        // }
-        if (inventory != null)
-        {
-            await inventory.SaveInventoryToCloud("inventory_save.json");
-            await inventory.SaveInventoryToCloud("New Inventory");
-            Debug.Log("[CloudSync] Inventory saved to cloud.");
-        }
-        Debug.Log("[CloudSync] SaveToCloud complete.");
+
+        await SaveNonStepDataToCloud();
+
+        Debug.Log("[CloudSync] ── SaveToCloud complete ─────────────────────────");
     }
+
 
     public async void LoadFromCloud()
     {
-        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
-        {
-            Debug.LogWarning("[CloudSync] Skipping cloud load — logout flag set.");
-            return;
-        }
-        // await PlayerPrefsCloudSync.LoadAllFromCloud();
-        // await overallStepCounter.LoadStepDataFromCloud();
-        // //overallStepCounter = FindObjectOfType<OverallStepCounter>();
-        // await playerData.LoadPlayerDataFromCloud();
-        // dailyRewardsWindow.LoadPlayerDataFromCloud();
-        // dynamicInterface.LoadInventoryFromCloudButton();
-        // staticInterface.LoadInventoryFromCloudButton();
-        Debug.Log("[CloudSync] Starting LoadFromCloud...");
-        await PlayerPrefsCloudSync.LoadAllFromCloud();
-        Debug.Log("[CloudSync] PlayerPrefs loaded from cloud.");
+        if (!IsSafeToProceed("LoadFromCloud")) return;
+
+        Debug.Log("[CloudSync] ── LoadFromCloud (manual) ──────────────────────");
+
+        await LoadNonStepDataFromCloud();
 
         if (overallStepCounter != null)
         {
             await overallStepCounter.LoadStepDataFromCloud();
-            Debug.Log("[CloudSync] Step data loaded from cloud.");
-            ForceStepRefresh(); // Force refresh after loading
+            Debug.Log("[CloudSync] Step data load requested.");
         }
+
+        Debug.Log("[CloudSync] ── LoadFromCloud complete ──────────────────────");
+    }
+
+    private async Task SaveNonStepDataToCloud()
+    {
+        await PlayerPrefsCloudSync.SaveAllToCloud();
+        Debug.Log("[CloudSync] PlayerPrefs saved.");
+
+        if (playerData != null)
+        {
+            await playerData.SavePlayerDataToCloud();
+            Debug.Log("[CloudSync] Player data saved.");
+        }
+
+        if (dailyRewardsWindow != null)
+        {
+            await dailyRewardsWindow.SaveDailyQuestProgressToCloud();
+            Debug.Log("[CloudSync] Daily quest progress saved.");
+        }
+
+        // Inventory.Save() writes to local binary file.
+        // SaveInventoryToCloud uploads the current in-memory Container as JSON.
+        if (inventory != null)
+        {
+            await inventory.SaveInventoryToCloud("inventory_save.json");
+            Debug.Log("[CloudSync] Inventory saved.");
+        }
+
+        if (inventory2 != null)
+        {
+            await inventory2.SaveInventoryToCloud("inventory2_save.json");
+            Debug.Log("[CloudSync] Inventory2 saved.");
+        }
+    }
+
+
+    private async Task LoadNonStepDataFromCloud()
+    {
+        if (!IsSafeToProceed("LoadNonStepDataFromCloud")) return;
+
+        Debug.Log("[CloudSync] ── LoadNonStepDataFromCloud ───────────────────");
+
+        await PlayerPrefsCloudSync.LoadAllFromCloud();
+        Debug.Log("[CloudSync] PlayerPrefs loaded.");
+
         if (playerData != null)
         {
             await playerData.LoadPlayerDataFromCloud();
-            Debug.Log("[CloudSync] Player data loaded from cloud.");
+            Debug.Log("[CloudSync] Player data loaded.");
         }
+
         if (dailyRewardsWindow != null)
         {
             await dailyRewardsWindow.LoadPlayerDataFromCloud();
-            Debug.Log("[CloudSync] Daily quest progress loaded from cloud.");
+            Debug.Log("[CloudSync] Daily quest progress loaded.");
         }
-        // if (dynamicInterface != null)
-        // {
-        //    await dynamicInterface.LoadInventoryFromCloudButton();
-        //     Debug.Log("[CloudSync] Dynamic inventory loaded from cloud.");
-        // }
-        // if (staticInterface != null)
-        // {
-        //    await staticInterface.LoadInventoryFromCloudButton();
-        //     Debug.Log("[CloudSync] Static inventory loaded from cloud.");
-        // }
+
         if (inventory != null)
         {
             await inventory.LoadInventoryFromCloud("inventory_save.json");
-            await inventory.LoadInventoryFromCloud("New Inventory");
-            Debug.Log("[CloudSync] Inventory loaded from cloud.");
+            Debug.Log("[CloudSync] Inventory loaded.");
         }
-        Debug.Log("[CloudSync] LoadFromCloud complete.");
 
+        if (inventory2 != null)
+        {
+            await inventory2.LoadInventoryFromCloud("inventory2_save.json");
+            Debug.Log("[CloudSync] Inventory2 loaded.");
+        }
+
+        Debug.Log("[CloudSync] ── LoadNonStepDataFromCloud complete ──────────");
     }
+
+    // ─────────────────────────────────────────────────────────
+    //  Guard
+    // ─────────────────────────────────────────────────────────
+
+    private bool IsSafeToProceed(string caller)
+    {
+        if (overallStepCounter != null && overallStepCounter.isLoggingOut)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — logout in progress.");
+            return false;
+        }
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — post-logout state.");
+            return false;
+        }
+        if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
+        {
+            Debug.LogWarning($"[CloudSync] {caller} blocked — cloud restore suppressed.");
+            return false;
+        }
+        return true;
+    }
+
     public void ForceStepRefresh()
     {
-        if (overallStepCounter != null)
-        {
-            Debug.Log("[Manual Trigger] Forcing step refresh...");
-            overallStepCounter.GetOverallSteps();
-        }
+        if (overallStepCounter == null) return;
+        overallStepCounter.GetOverallSteps();
     }
-
 }

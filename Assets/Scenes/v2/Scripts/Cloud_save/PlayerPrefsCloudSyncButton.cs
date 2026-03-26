@@ -170,14 +170,6 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         return true;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Utility
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Only use for a manual poll outside the normal refresh loop.
-    /// Do NOT call after LoadStepDataFromCloud — FinalizeCloudLoad handles that.
-    /// </summary>
     public void ForceStepRefresh()
     {
         if (overallStepCounter == null) return;

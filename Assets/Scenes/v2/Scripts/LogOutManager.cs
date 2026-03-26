@@ -8,17 +8,6 @@ using System.Threading.Tasks;
 using Unity.Services.CloudSave;
 using System;
 
-/// <summary>
-/// Handles full player logout:
-///   1. Sets isLoggingOut on OverallStepCounter FIRST — master guard that blocks
-///      all saves (local + cloud) for the rest of the session.
-///   2. Disables PlayerPrefsCloudSyncButton so it cannot trigger a save mid-wipe.
-///   3. Deletes all cloud data and signs out.
-///   4. Wipes all local data (PlayerPrefs, files, ScriptableObjects, DDOL objects).
-///   5. Sets HasLoggedOut + SuppressCloudRestore so the next Awake() on
-///      OverallStepCounter initializes a fresh zero-baseline session.
-///   6. Reloads the Entry Screen.
-/// </summary>
 public class LogOutManager : MonoBehaviour
 {
     [Header("UI")]
@@ -28,9 +17,6 @@ public class LogOutManager : MonoBehaviour
     {
         Debug.Log("[LOGOUT] ── Starting logout ─────────────────────────────────────");
 
-        // ── Step 1: Block all saves immediately ──────────────────────────────────
-        // isLoggingOut = true makes every save path in OverallStepCounter a no-op.
-        // This must be the very first action before any await.
         OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
         if (stepCounter != null)
         {
@@ -42,11 +28,9 @@ public class LogOutManager : MonoBehaviour
         PlayerPrefsCloudSyncButton syncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
         if (syncButton != null) syncButton.enabled = false;
 
-        // ── Step 2: Ensure Unity Services are ready ──────────────────────────────
         if (UnityServices.State != ServicesInitializationState.Initialized)
             await UnityServices.InitializeAsync();
 
-        // ── Step 3: Delete cloud data and sign out ───────────────────────────────
         if (AuthenticationService.Instance.IsSignedIn)
         {
             Debug.Log("[LOGOUT] Deleting cloud data...");
@@ -55,12 +39,8 @@ public class LogOutManager : MonoBehaviour
             Debug.Log("[LOGOUT] Signed out.");
         }
 
-        // ── Step 4: Wipe all local data ──────────────────────────────────────────
         NuclearDataWipe(stepCounter);
 
-        // ── Step 5: Set flags for the new session ────────────────────────────────
-        // HasLoggedOut      → Awake() routes to post-logout init (zero baseline)
-        // SuppressCloudRestore → blocks cloud load until new player signs in
         PlayerPrefs.SetInt("HasLoggedOut", 1);
         PlayerPrefs.SetInt("SuppressCloudRestore", 1);
         PlayerPrefs.DeleteKey("CloudRestored");
@@ -68,19 +48,12 @@ public class LogOutManager : MonoBehaviour
         PlayerPrefs.Save();
         Debug.Log("[LOGOUT] Session flags set.");
 
-        // ── Step 6: Reload ───────────────────────────────────────────────────────
         if (loadingPanel != null) loadingPanel.SetActive(true);
         StartCoroutine(ReloadEntryScreen(2f));
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Wipe
-    // ─────────────────────────────────────────────────────────
-
     private void NuclearDataWipe(OverallStepCounter stepCounter)
     {
-        // ResetStepDataCompletely: stops coroutines, increments sessionGen
-        // (kills all in-flight StepCounterRequest callbacks), deletes local file.
         if (stepCounter != null)
         {
             stepCounter.ResetStepDataCompletely();
@@ -142,13 +115,6 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Destroys DontDestroyOnLoad objects except:
-    ///   • This GameObject   — needed to finish the coroutine
-    ///   • OverallStepCounter — must survive so isLoggingOut stays true until the
-    ///     scene reload completes, blocking any final OnApplicationQuit save.
-    ///   • EventSystem / AudioListener — required for UI/audio during reload
-    /// </summary>
     private void DestroyPersistentObjects(OverallStepCounter stepCounter)
     {
         GameObject self           = gameObject;
@@ -172,10 +138,6 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Cloud
-    // ─────────────────────────────────────────────────────────
-
     [Obsolete]
     private async Task DeleteAllCloudSaveData()
     {
@@ -194,11 +156,6 @@ public class LogOutManager : MonoBehaviour
             Debug.LogWarning($"[LOGOUT] Error deleting cloud data: {e.Message}");
         }
     }
-
-    // ─────────────────────────────────────────────────────────
-    //  Scene Reload
-    // ─────────────────────────────────────────────────────────
-
     private IEnumerator ReloadEntryScreen(float delay)
     {
         yield return new WaitForSeconds(delay);

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4bbe86429089d94bb4386f6dc957382, type: 3}
+  m_Name: HeadSetQuest
+  m_EditorClassIdentifier: 
+  NPCName: Old Man Kaius
+  PlayerName: Ezenik
+  DialogueLines:
+  - lines:
+    - "\"Ah, you\u2019ve heard the whispers, haven\u2019t you? Of a treasure unlike
+      any other \u2014 a pair of headphones, forged by an eccentric maestro whose
+      music spanned a thousand worlds.\""
+  - lines:
+    - "\"Put them on, they say, and you\u2019ll hear a symphony that speaks to your
+      very soul. Not just sound, but the heartbeat of creation itself. A melody that
+      sharpens the mind, kindles focus, and silences the noise that clouds your thoughts.\""
+  - lines:
+    - "\"Some say these headphones don\u2019t just block out the world\u2019s clamor\u2026
+      they drown out doubt. Leaving behind only the steady rhythm of determination.\""
+  - lines:
+    - '"A rare treasure, indeed. One that finds those ready to listen."'
+  ReturnLines: []

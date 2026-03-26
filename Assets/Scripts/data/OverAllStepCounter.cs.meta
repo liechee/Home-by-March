@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts/data/OverAllStepCounter.cs.meta
+guid: 444e73ae44262624e88007c601d84d45
+========
+guid: 53a663d7a5218b147bf30949295b20f7
+>>>>>>>> da94c24949c8e52c8186613a6615f6f8654f071b:Assets/Scripts/Maze/DetectPlayersInMapCenter.cs.meta
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

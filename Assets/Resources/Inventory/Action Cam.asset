@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Action Cam
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 96e35d9d576265742b76ffceff9eabed, type: 3}
+  characterDisplay: {fileID: 4430346391445410563, guid: 269b214bc34aa624ca0e40793d456586, type: 3}
+  stackable: 0
+  type: 2
+  description: "Engineered by a wanderer obsessed with capturing fleeting moments,
+    this Action Camera gleams with boundless curiosity. Its lens seems to glint with
+    its own light, as though preserving not just images but the emotions tied to
+    them. It\u2019s said to inspire daring adventures, whispering that every moment
+    holds a story waiting to be told."
+  data:
+    Name: Action Camera
+    Id: 33
+    buffs:
+    - attribute: 3
+      value: 25
+      min: 0
+      max: 0
+  skillData: {fileID: 11400000, guid: a29073620f244ab479f1fd6e054f05a1, type: 2}
+  boneNames: []

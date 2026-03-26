@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: MakeUpBrush
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 486a5a90c4a8df248a067b0c23863920, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: 01a0613371c0cf9429c02df3a5588b71, type: 3}
+  stackable: 0
+  type: 2
+  description: Crafted by a perfectionist who believed beauty lies in the details,
+    this Makeup Brush glides like a whisper across the skin. Its bristles shimmer
+    faintly, infused with the magic of self-expression. Legends say it enhances not
+    only appearances but also confidence, as though unveiling the radiant spirit
+    of its wielder with every stroke.
+  data:
+    Name: 
+    Id: 38
+    buffs: []
+  skillData: {fileID: 0}
+  boneNames: []

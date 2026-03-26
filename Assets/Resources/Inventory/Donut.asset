@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Donut
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 36732b1065bc588499926ba97caa474b, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: e333d24fa3ee6944d8658968d3dd1805, type: 3}
+  stackable: 0
+  type: 3
+  description: Born from the dream of a baker who wished to sweeten even the sourest
+    of days, this Donut radiates a warmth that soothes the soul. Its glaze sparkles
+    like dew in the morning sun, hinting at an enchantment that lifts spirits. Some
+    say the first bite fills the heart with memories of laughter and joy, no matter
+    how dark the day.
+  data:
+    Name: Donut
+    Id: 49
+    buffs:
+    - attribute: 2
+      value: 20
+      min: 0
+      max: 0
+  skillData: {fileID: 0}
+  boneNames: []

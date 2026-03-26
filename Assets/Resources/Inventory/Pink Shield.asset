@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Pink Shield
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 47c741509f8afe74e91464830fce0448, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: 3ecbe8fbabb2c90499ef2ad3ae364cbf, type: 3}
+  stackable: 0
+  type: 3
+  description: Fashioned from a metal imbued with the essence of compassion, the
+    Pink Shield gleams with a soft yet resolute light. Its surface bears intricate
+    floral engravings, said to bloom brighter when protecting others. Legends tell
+    of its ability to reflect not just strikes, but also fear, turning hostility
+    into harmony with each unwavering stance.
+  data:
+    Name: Pink Shield
+    Id: 46
+    buffs:
+    - attribute: 2
+      value: 15
+      min: 0
+      max: 0
+  skillData: {fileID: 11400000, guid: a098e456e9f59d34db8d8412fd9cc704, type: 2}
+  boneNames: []

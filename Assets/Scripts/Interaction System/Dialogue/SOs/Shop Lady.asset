@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4bbe86429089d94bb4386f6dc957382, type: 3}
+  m_Name: Shop Lady
+  m_EditorClassIdentifier: 
+  NPCName: Strange Warrior
+  PlayerName: Ezenik
+  DialogueLines:
+  - lines:
+    - "\"Marcher, huh? You\u2019ve got that look\u2014the kind that doesn\u2019t
+      know what\u2019s coming.\"\r\n"
+  - lines:
+    - "\"They hum with motion, restless and wild. Perfect for someone who won\u2019t
+      stand still.\""
+    - '"Think you can handle one? Then make it worth my while. I''m not here for
+      charity."'
+  ReturnLines:
+  - lines:
+    - '"What are these weapons? They seem peculiar for a weapon."'

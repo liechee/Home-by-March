@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a359555bfc745164d8d91359f66cae2d, type: 3}
+  m_Name: Chinese new year shield
+  m_EditorClassIdentifier: 
+  uiDisplay: {fileID: 21300000, guid: 4f22e2f5d56409047a70f018a2394aee, type: 3}
+  characterDisplay: {fileID: 919132149155446097, guid: 0b8a85148751c1e4480dbd1a2ea65380, type: 3}
+  stackable: 0
+  type: 0
+  description: '[CHINESE NEW YEAR EVENT REWARD] Despite being a shield, with it equipped,
+    you feel that you attack with more positive emotion than before.  What an interesting
+    contradiction.'
+  data:
+    Name: She Mao Dun
+    Id: 53
+    buffs:
+    - attribute: 3
+      value: 10
+      min: 0
+      max: 0
+  skillData: {fileID: 0}
+  boneNames: []

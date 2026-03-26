@@ -10,10 +10,10 @@ using System.Threading.Tasks;
 public class OverallStepCounter : MonoBehaviour
 {
 
-    [Tooltip("Seconds between step polls. 0.5s is the fastest practical value — " +
+    [Tooltip("Seconds between step polls. 0.2s provides faster updates while remaining practical — " +
              "lower values waste battery without gaining real-time accuracy because " +
              "the OS sensor batches data regardless of poll rate.")]
-    public float refreshInterval = 0.5f;
+    public float refreshInterval = 0.2f;
 
     [Tooltip("Minimum step change before firing onStepsUpdated. Keep at 1.")]
     public int  stepChangeThreshold = 1;
@@ -414,6 +414,8 @@ public class OverallStepCounter : MonoBehaviour
     {
         if (isLoggingOut) return;
 
+        int localDailyBeforeCloud = stepData?.dailySteps ?? 0;
+
         if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
         {
             bool newSession = IsSignedIn() && PlayerPrefs.GetInt("HasLoggedOut", 0) == 0;
@@ -466,7 +468,7 @@ public class OverallStepCounter : MonoBehaviour
                       $"cloudDate={cloudDate:yyyy-MM-dd}, today={DateTime.Today:yyyy-MM-dd}");
             Debug.Log($"[CLOUD] Path → {(daysSince == 0 ? "SameDay (daily preserved)" : daysSince == 1 ? "NewDay (daily=0)" : "MultiDay (daily=0)")}");
 
-            if      (daysSince == 0) ApplyCloudSameDay(cloudBase, gen);
+            if      (daysSince == 0) ApplyCloudSameDay(cloudBase, gen, localDailyBeforeCloud);
             else if (daysSince == 1) ApplyCloudNewDay(cloudBase, gen);
             else                     ApplyCloudMultiDayGap(cloudBase, cloudDate, gen);
         }
@@ -484,7 +486,7 @@ public class OverallStepCounter : MonoBehaviour
         }
     }
 
-    private void ApplyCloudSameDay(int cloudBase, int gen)
+    private void ApplyCloudSameDay(int cloudBase, int gen, int localDailyBeforeCloud)
     {
         int cloudSavedDaily = stepData.dailySteps;
 
@@ -497,7 +499,8 @@ public class OverallStepCounter : MonoBehaviour
             }
         }
 
-        int localDailyAtSignIn = stepData?.dailySteps > 0 ? stepData.dailySteps : 0;
+        int localDailyAtSignIn = Math.Max(0, localDailyBeforeCloud);
+        int preCloudAppOpen    = appOpenCaptured ? appOpenDeviceSteps : -1;
 
         new StepCounterRequest().Since(DateTime.Today).OnQuerySuccess((deviceNow) =>
         {
@@ -507,17 +510,16 @@ public class OverallStepCounter : MonoBehaviour
             PlayerPrefs.Save();
 
             if (!appOpenCaptured)
-            {
                 Debug.LogWarning("[CLOUD] appOpenDeviceSteps not captured — using deviceNow as fallback.");
-                appOpenDeviceSteps = deviceNow;
-                appOpenCaptured    = true;
-            }
+
+            appOpenDeviceSteps = deviceNow;
+            appOpenCaptured    = true;
 
             overallSteps            = cloudBase;
             overallStepsBeforeToday = cloudBase;
             beforeTodaySettled      = true;
 
-            int offlineSteps = appOpenCaptured ? Math.Max(0, deviceNow - appOpenDeviceSteps) : 0;
+            int offlineSteps = preCloudAppOpen >= 0 ? Math.Max(0, deviceNow - preCloudAppOpen) : 0;
             int effectiveBase = Math.Max(cloudSavedDaily, localDailyAtSignIn);
 
             savedDailyBase      = effectiveBase;
@@ -819,6 +821,7 @@ public class OverallStepCounter : MonoBehaviour
     }
 
     private int GetEstimatedTodayStepsFromDisk() => stepData.dailySteps;
+
 
     private TaskCompletionSource<int> appOpenTcs = new TaskCompletionSource<int>();
 

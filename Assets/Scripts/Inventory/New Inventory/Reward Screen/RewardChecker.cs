@@ -14,21 +14,18 @@ public class RewardChecker : MonoBehaviour
 
     private int overallSteps;
     private OverallStepCounter stepCounter;
+    [SerializeField] private bool debugLogs = false;
 
     void Awake()
     {
         stepCounter = FindObjectOfType<OverallStepCounter>();
-        
+
         if (stepCounter != null)
         {
-            // Subscribe to step update events
-            OverallStepCounter.onStepsUpdated += OnStepsUpdated;
-            OverallStepCounter.onLoaded += OnStepDataLoaded;
-
             // Get initial value (may be 0 until OverallStepCounter finishes loading)
             overallSteps = stepCounter.overallSteps;
-
-            Debug.Log($"RewardChecker: Initialized with {overallSteps} steps from OverallStepCounter, subscribed to events");
+            if (debugLogs)
+                Debug.Log($"RewardChecker: Initialized with {overallSteps} steps from OverallStepCounter");
         }
         else
         {
@@ -39,14 +36,30 @@ public class RewardChecker : MonoBehaviour
         UpdateButtonState();
     }
 
+    void OnEnable()
+    {
+        if (stepCounter == null)
+            stepCounter = FindObjectOfType<OverallStepCounter>();
+
+        if (stepCounter == null) return;
+
+        // Idempotent subscription to avoid duplicate listeners after repeated enable/sign-in cycles.
+        OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        OverallStepCounter.onLoaded -= OnStepDataLoaded;
+        OverallStepCounter.onStepsUpdated += OnStepsUpdated;
+        OverallStepCounter.onLoaded += OnStepDataLoaded;
+    }
+
+    void OnDisable()
+    {
+        OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        OverallStepCounter.onLoaded -= OnStepDataLoaded;
+    }
+
     void OnDestroy()
     {
-        // IMPORTANT: Unsubscribe from events to prevent memory leaks
-        if (stepCounter != null)
-        {
-            OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
-            OverallStepCounter.onLoaded -= OnStepDataLoaded;
-        }
+        OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        OverallStepCounter.onLoaded -= OnStepDataLoaded;
     }
 
     // Event handler - called when OverallStepCounter finishes calculating steps
@@ -54,7 +67,8 @@ public class RewardChecker : MonoBehaviour
     {
         overallSteps = newOverallSteps;
         UpdateButtonState();
-        Debug.Log($"RewardChecker: Steps updated via event to {overallSteps}");
+        if (debugLogs)
+            Debug.Log($"RewardChecker: Steps updated via event to {overallSteps}");
     }
 
     void OnStepDataLoaded()
@@ -64,7 +78,8 @@ public class RewardChecker : MonoBehaviour
         {
             overallSteps = stepCounter.overallSteps;
             UpdateButtonState();
-            Debug.Log($"RewardChecker: Step data loaded - overallSteps set to {overallSteps}");
+            if (debugLogs)
+                Debug.Log($"RewardChecker: Step data loaded - overallSteps set to {overallSteps}");
         }
     }
 

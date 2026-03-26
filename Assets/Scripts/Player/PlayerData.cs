@@ -89,7 +89,7 @@ public class PlayerData : MonoBehaviour
         UpdateCurrentStats();
     }
 
-    public void OnApplicationClose() => SavePlayerData();
+    public void OnApplicationClose() => SavePlayerDataAndSyncCloud();
 
     // ─────────────────────────────────────────────────────────
     //  Stats helpers
@@ -114,17 +114,17 @@ public class PlayerData : MonoBehaviour
         movementSpeed = movementSpeed / 0.995f;
 
         UpdateCurrentStats();
-        SavePlayerData();
+        SavePlayerDataAndSyncCloud();
     }
 
-    public void AddGold(int amount) { gold += amount; SavePlayerData(); }
-    public void SubtractGold(int amount) { gold -= amount; SavePlayerData(); }
+    public void AddGold(int amount) { gold += amount; SavePlayerDataAndSyncCloud(); }
+    public void SubtractGold(int amount) { gold -= amount; SavePlayerDataAndSyncCloud(); }
     public void GainGold() => AddGold(1000);
 
     public void ChangePlayerName(string name)
     {
         playerName = name;
-        SavePlayerData();
+        SavePlayerDataAndSyncCloud();
         Debug.Log($"[PlayerData] Name changed to '{playerName}'.");
     }
 
@@ -189,6 +189,8 @@ public class PlayerData : MonoBehaviour
     public async Task SavePlayerDataToCloud()
     {
         if (isLoggingOut) return;
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
+        if (!AuthenticationService.Instance.IsSignedIn) return;
 
         // Always rebuild from live fields so cloud receives current state,
         // not whatever data was last written by SavePlayerData().
@@ -219,58 +221,11 @@ public class PlayerData : MonoBehaviour
                 return;
             }
 
-            // ── Gold merge rule: add cloud gold on top of current local gold ──────
-            //
-            // Why: the player may have earned gold offline (before signing in) or
-            // in a session where the cloud save didn't complete. Blindly replacing
-            // local gold with cloud gold would discard that progress.
-            //
-            // How it works:
-            //   localGold  = gold currently in memory (earned this session or loaded from disk)
-            //   cloudGold  = gold stored in the cloud from the last successful save
-            //   result     = localGold + cloudGold
-            //
-            // Edge cases:
-            //   • First ever sign-in (no local progress): localGold = 0, result = cloudGold ✓
-            //   • Cloud and local are in sync (last save completed): localGold = cloudGold,
-            //     result = cloudGold * 2 — this is the one case you need to avoid.
-            //     Solution: only merge when we know local has UNSYNCED progress, otherwise
-            //     just take cloud directly. We detect this by comparing local vs cloud gold:
-            //     if they are equal, no unsynced progress exists so just use cloud.
-            int localGold = gold; // current in-memory gold before cloud overwrites it
-            int cloudGold = loaded.gold;
-
-            // Apply all cloud fields first (name, level, stats etc.)
+            // Cloud load is authoritative for this account/session.
+            // Never add local+cloud gold here, otherwise repeated loads can duplicate money.
             ApplySaveData(loaded);
 
-            // Now resolve gold:
-            if (localGold == cloudGold)
-            {
-                // In sync — no unsynced local progress. Use cloud value as-is.
-                gold = cloudGold;
-                Debug.Log($"[PlayerData] Gold in sync — using cloud value: {gold}");
-            }
-            else if (localGold > cloudGold)
-            {
-                // Local has more gold than cloud — player earned gold since last cloud save.
-                // Add the difference on top of cloud gold so nothing is lost.
-                int unearnedLocally = localGold - cloudGold;
-                gold = cloudGold + unearnedLocally; // = localGold (keeps local progress)
-                Debug.Log($"[PlayerData] Local gold ({localGold}) > cloud gold ({cloudGold}) " +
-                          $"— keeping local: {gold}");
-            }
-            else
-            {
-                // Cloud has more gold than local — cloud is ahead (e.g. earned on another device).
-                // Add local session gold on top of the higher cloud value.
-                gold = cloudGold + localGold;
-                Debug.Log($"[PlayerData] Cloud gold ({cloudGold}) > local gold ({localGold}) " +
-                          $"— combined: {gold}");
-            }
-
-            data = BuildSaveData(); // rebuild with merged gold
-
-            // Persist merged result locally and to cloud so both stay in sync.
+            // Persist authoritative cloud result locally so both stores align.
             SavePlayerData();
 
             Debug.Log($"[PlayerData] Cloud loaded — name='{playerName}', level={level}, gold={gold}");
@@ -280,6 +235,17 @@ public class PlayerData : MonoBehaviour
             Debug.LogError($"[PlayerData] Cloud load failed: {e.Message} — falling back to local.");
             LoadPlayerData();
         }
+    }
+
+    private void SavePlayerDataAndSyncCloud()
+    {
+        SavePlayerData();
+
+        if (isLoggingOut) return;
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
+        if (!AuthenticationService.Instance.IsSignedIn) return;
+
+        _ = SavePlayerDataToCloud();
     }
 
     // ─────────────────────────────────────────────────────────

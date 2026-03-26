@@ -6,24 +6,8 @@ using TMPro;
 using HomeByMarch;
 using System;
 
-/// <summary>
-/// Displays step counts, level, and experience bar.
-///
-/// Single source of truth: ALL step data comes from OverallStepCounter events.
-/// UserLevel never reads the step file or applies offsets directly — that logic
-/// lives exclusively in OverallStepCounter to avoid the two systems drifting apart.
-///
-/// Startup sequence:
-///   1. Subscribe to onStepsUpdated + onLoaded.
-///   2. If OverallStepCounter already has data (e.g. loaded before this scene),
-///      pull its current values immediately so the UI is never blank.
-///   3. All subsequent updates arrive via onStepsUpdated.
-/// </summary>
 public class UserLevel : MonoBehaviour
 {
-    // ─────────────────────────────────────────────────────────
-    //  UI References
-    // ─────────────────────────────────────────────────────────
 
     [Header("Level UI")]
     [SerializeField] public TMP_Text levelText;
@@ -44,34 +28,22 @@ public class UserLevel : MonoBehaviour
     public TMP_Text userNameText;
     public PlayerData playerData;
 
-    // ─────────────────────────────────────────────────────────
-    //  Step State  (written only from OnStepsUpdated)
-    // ─────────────────────────────────────────────────────────
 
-    public int currentStepCount;      // kept for LogOutManager reset compat
+    public int currentStepCount;     
     public int dailyStepCount;
     public int overallStepCount;
     public int totalStepsForNextLevel;
     public int remainingStepsForNextLevel;
 
-    // ─────────────────────────────────────────────────────────
-    //  Private
-    // ─────────────────────────────────────────────────────────
 
     private OverallStepCounter stepCounter;
+    [SerializeField] private bool debugStepLogs = false;
 
-    // ─────────────────────────────────────────────────────────
-    //  Lifecycle
-    // ─────────────────────────────────────────────────────────
 
     void Awake()
     {
         playerData  = FindObjectOfType<PlayerData>();
         stepCounter = FindObjectOfType<OverallStepCounter>();
-
-        // Subscribe before anything else so no event is ever missed
-        OverallStepCounter.onStepsUpdated += OnStepsUpdated;
-        OverallStepCounter.onLoaded       += OnStepDataLoaded;
 
         // Initialize display thresholds so the UI is structurally valid even before
         // real step data arrives — but do NOT zero-flash if we already have data.
@@ -81,11 +53,6 @@ public class UserLevel : MonoBehaviour
 
     void Start()
     {
-        // By Start(), OverallStepCounter has had its own Awake + Start run.
-        // Pull whatever it currently holds — this covers the scene-reload case
-        // where the counter is DontDestroyOnLoad and already has correct values.
-        // The check uses stepData != null rather than overallSteps > 0 so players
-        // with genuinely 0 steps still get a correct (zero) display, not a stale one.
         if (stepCounter != null && stepCounter.stepData != null)
         {
             ApplySteps(stepCounter.overallSteps, stepCounter.stepData.dailySteps);
@@ -98,20 +65,30 @@ public class UserLevel : MonoBehaviour
         }
     }
 
+    void OnEnable()
+    {
+        if (stepCounter == null)
+            stepCounter = FindObjectOfType<OverallStepCounter>();
+
+        // Idempotent subscription to avoid duplicate listeners after scene/UI toggles.
+        OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        OverallStepCounter.onLoaded -= OnStepDataLoaded;
+        OverallStepCounter.onStepsUpdated += OnStepsUpdated;
+        OverallStepCounter.onLoaded += OnStepDataLoaded;
+    }
+
+    void OnDisable()
+    {
+        OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
+        OverallStepCounter.onLoaded -= OnStepDataLoaded;
+    }
+
     void OnDestroy()
     {
         OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
         OverallStepCounter.onLoaded       -= OnStepDataLoaded;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Event Handlers
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Fired by OverallStepCounter every time the step count changes meaningfully.
-    /// This is the single entry point for all step data — no file reads here.
-    /// </summary>
     private void OnStepsUpdated(int newOverall, int newDaily)
     {
         if (newOverall < 0 || newDaily < 0)
@@ -120,20 +97,9 @@ public class UserLevel : MonoBehaviour
             return;
         }
 
-        // NOTE: Do NOT add an equality guard here.
-        // Cloud finalization fires onStepsUpdated with the correct value even when
-        // it happens to equal what is already displayed (e.g. both 0 post-logout).
-        // Dropping it would leave the UI stale until the next scene reload.
-        // OverallStepCounter's stepChangeThreshold already debounces noisy poll updates,
-        // so duplicate suppression here is unnecessary and harmful.
         ApplySteps(newOverall, newDaily);
     }
 
-    /// <summary>
-    /// Fired by OverallStepCounter when initial data is ready (local file or cloud).
-    /// Always applies unconditionally — never skip, even if values appear unchanged,
-    /// because this may be the cloud value arriving after a local-file placeholder.
-    /// </summary>
     private void OnStepDataLoaded()
     {
         if (stepCounter == null) return;
@@ -141,16 +107,6 @@ public class UserLevel : MonoBehaviour
                    stepCounter.stepData != null ? stepCounter.stepData.dailySteps : 0);
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Core Apply Logic
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Single method that accepts authoritative step values from OverallStepCounter,
-    /// recalculates level and XP, then updates the UI.
-    /// All previous paths (file reads, offset math, cloud branches) are removed —
-    /// OverallStepCounter owns that logic exclusively.
-    /// </summary>
     private void ApplySteps(int newOverall, int newDaily)
     {
         overallStepCount = newOverall;
@@ -160,13 +116,10 @@ public class UserLevel : MonoBehaviour
         RecalculateLevelAndXP();
         RefreshUI();
 
-        Debug.Log($"[UserLevel] Applied — Overall: {overallStepCount}, Daily: {dailyStepCount}, Level: {playerData.level}");
+        if (debugStepLogs)
+            Debug.Log($"[UserLevel] Applied — Overall: {overallStepCount}, Daily: {dailyStepCount}, Level: {playerData.level}");
     }
 
-    /// <summary>
-    /// Checks for level-ups and recalculates XP thresholds.
-    /// Level-up logic is only here, not duplicated across Init/Update/Cloud paths.
-    /// </summary>
     private void RecalculateLevelAndXP()
     {
         if (playerData == null) return;
@@ -178,16 +131,13 @@ public class UserLevel : MonoBehaviour
             playerData.LevelUp();
             playerData.lastSavedLevel = playerData.level;
             playerData.SavePlayerData();
-            Debug.Log($"[UserLevel] Level up → {playerData.level}");
+            if (debugStepLogs)
+                Debug.Log($"[UserLevel] Level up → {playerData.level}");
         }
 
         totalStepsForNextLevel     = CalculateTotalStepsForLevel(playerData.level + 1);
         remainingStepsForNextLevel = Mathf.Max(0, totalStepsForNextLevel - overallStepCount);
     }
-
-    // ─────────────────────────────────────────────────────────
-    //  UI Refresh
-    // ─────────────────────────────────────────────────────────
 
     private void RefreshUI()
     {
@@ -247,9 +197,6 @@ public class UserLevel : MonoBehaviour
         Debug.Log($"[UserLevel] XP bar — level={playerData.level}, stepsThisLevel={stepsThisLevel}, fill={fill:F2}");
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Helpers
-    // ─────────────────────────────────────────────────────────
 
     public int CalculateTotalStepsForLevel(int level)
     {
@@ -261,15 +208,6 @@ public class UserLevel : MonoBehaviour
         return number >= 10000 ? Mathf.Floor(number / 1000f) + "K" : number.ToString();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Reset  (called by LogOutManager)
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Zeroes all step display state and refreshes UI to 0.
-    /// Called by LogOutManager as part of the nuclear wipe.
-    /// The actual step data reset lives in OverallStepCounter.ResetStepDataCompletely().
-    /// </summary>
     public void ResetStepData()
     {
         ZeroDisplayState();

@@ -1,40 +1,50 @@
-using UnityEditor;
 using UnityEngine;
 
 public class OneTimePanelAccess : MonoBehaviour
 {
-    public GameObject panel; // Reference to the panel you want to show
-   // [SerializeField] private GameObject chest;
-    public string itemClaimedKey = "ItemClaimed"; // Key for PlayerPrefs
+    public GameObject panel;
+    public string itemClaimedKey = "ItemClaimed";
 
     void Start()
     {
-        // Check if the item has been claimed before
-        if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 0)
+
+        // If already claimed, disable this object so it can't trigger again
+        if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 1)
         {
-            // Show the panel if the item hasn't been claimed
-            panel.SetActive(true);
-           // chest.SetActive(true);
-        }
-        else
-        {
-            // Hide the panel if the item has already been claimed
-            panel.SetActive(false);
-           // chest.SetActive(false);
+            gameObject.SetActive(false);
         }
     }
 
-    // Call this method when the item is claimed
+    public void ShowPanel()
+    {
+        if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 0)
+        {
+            panel.SetActive(true);
+        }
+    }
+
     public void ClaimItem()
     {
-        // Mark the item as claimed in PlayerPrefs
+        // Persist the claim
         PlayerPrefs.SetInt(itemClaimedKey, 1);
         PlayerPrefs.Save();
 
         // Close the panel
         panel.SetActive(false);
-//        chest.SetActive(false);
-        PlayerPrefs.Save();
+
+        // Find and hide all matching treasure chests in the scene
+        Treasure[] treasures = FindObjectsOfType<Treasure>(true);
+        foreach (Treasure treasure in treasures)
+        {
+            if (treasure != null && treasure.UsesClaimKey(itemClaimedKey))
+            {
+                treasure.gameObject.SetActive(false);
+            }
+        }
+
+        // Disable self so this panel can never trigger again this session
+        gameObject.SetActive(false);
+
         Debug.Log("Item claimed and panel closed.");
     }
 }

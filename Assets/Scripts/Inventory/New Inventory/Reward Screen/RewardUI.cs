@@ -20,7 +20,7 @@ public class RewardUI : MonoBehaviour
     public InventoryObject inventory;
     public PlayerData playerData;
 
-   // public GameObject confirmPurchasePanel;
+    // public GameObject confirmPurchasePanel;
     public Button confirmButton;
     public GameObject insufficientGoldPanel;
     private RewardItem currentShopItem;
@@ -30,6 +30,7 @@ public class RewardUI : MonoBehaviour
 
     public ResultHandler resultHandler;
     public GameObject chest;
+    [SerializeField] private string itemClaimedKey = "ItemClaimed";
 
     void Start()
     {
@@ -55,8 +56,13 @@ public class RewardUI : MonoBehaviour
     private void OnClaimButtonClick()
     {
         ClaimAllItems();
-        Destroy(chest);
-       // confirmPurchasePanel.SetActive(false);
+        // Save claimed state so chest stays gone after scene reload
+        PlayerPrefs.SetInt(itemClaimedKey, 1);
+        PlayerPrefs.Save();
+
+        // Hide the chest instead of destroying it, so Treasure.cs can also deactivate it
+        if (chest != null)
+            chest.SetActive(false);
     }
 
     private void ClaimAllItems()

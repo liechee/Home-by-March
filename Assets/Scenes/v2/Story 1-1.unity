@@ -3176,8 +3176,9 @@ MonoBehaviour:
   currentHealth: 0
   currentCooldown: 0
   currentMovementSpeed: 0
-  playerAttributes: {fileID: 5634318678145909313}
   lastSavedLevel: 0
+  playerAttributes: {fileID: 5634318678145909313}
+  isLoggingOut: 0
 --- !u!114 &135324855
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15652,6 +15653,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: test
 --- !u!20 &872033880 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 3751020206624676063, guid: 13a5de6a55f09d744976956bfee10b17, type: 3}
@@ -15753,6 +15755,10 @@ PrefabInstance:
       propertyPath: resultHandler
       value: 
       objectReference: {fileID: 135324865}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: test
+      objectReference: {fileID: 0}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 
@@ -21223,6 +21229,10 @@ PrefabInstance:
       propertyPath: resultHandler
       value: 
       objectReference: {fileID: 135324865}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: Chest
+      objectReference: {fileID: 0}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 
@@ -33330,7 +33340,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: -208.4, y: -3.3, z: -5}
-  m_LocalScale: {x: 1, y: 23.34111, z: 187.95905}
+  m_LocalScale: {x: 1, y: 46.306427, z: 187.95905}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 381870388}
@@ -34241,7 +34251,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -303.5, y: -5.4, z: 89.7}
-  m_LocalScale: {x: 1, y: 23.34111, z: 187.95905}
+  m_LocalScale: {x: 1, y: 53.346107, z: 187.95905}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 381870388}
@@ -38174,6 +38184,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: Chest1
 --- !u!1001 &2021519160
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -38563,7 +38574,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -113.2, y: -5.4, z: 89.7}
-  m_LocalScale: {x: 1, y: 23.34111, z: 187.95905}
+  m_LocalScale: {x: 1, y: 47.27275, z: 187.95905}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 381870388}
@@ -38781,6 +38792,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: Chest
 --- !u!1001 &2062501872
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -40238,6 +40250,10 @@ PrefabInstance:
       propertyPath: resultHandler
       value: 
       objectReference: {fileID: 135324865}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: Chest1
+      objectReference: {fileID: 0}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 

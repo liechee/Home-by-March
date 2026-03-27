@@ -961,8 +961,9 @@ MonoBehaviour:
   currentHealth: 0
   currentCooldown: 0
   currentMovementSpeed: 0
-  playerAttributes: {fileID: 5634318678145909313}
   lastSavedLevel: 0
+  playerAttributes: {fileID: 5634318678145909313}
+  isLoggingOut: 0
 --- !u!114 &135324855
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1376,6 +1377,10 @@ PrefabInstance:
       propertyPath: resultHandler
       value: 
       objectReference: {fileID: 135324865}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: Chest31
+      objectReference: {fileID: 0}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 
@@ -18556,7 +18561,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 9.85e-43, y: 1.61e-43, z: 0, w: 2.4170816e+33}
+  m_BoundingSphereOverride: {x: 4.85e-43, y: 7.1e-44, z: 0, w: 1.288159e-34}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
@@ -25915,6 +25920,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: Chest31
 --- !u!1 &2059757676 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1234020712108744, guid: f325b8f9e3329544e8b8280f390f091e, type: 3}

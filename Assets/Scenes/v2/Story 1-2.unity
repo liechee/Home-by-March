@@ -1796,8 +1796,9 @@ MonoBehaviour:
   currentHealth: 0
   currentCooldown: 0
   currentMovementSpeed: 0
-  playerAttributes: {fileID: 5634318678145909313}
   lastSavedLevel: 0
+  playerAttributes: {fileID: 5634318678145909313}
+  isLoggingOut: 0
 --- !u!114 &135324855
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15284,6 +15285,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 135324865}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: Chest22
+      objectReference: {fileID: 0}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 
       objectReference: {fileID: 0}
@@ -27668,6 +27673,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: Chest22
 --- !u!1 &2005332144 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1500812484898266, guid: f22df5a7e1d0b104da386f4ef2a49de2, type: 3}
@@ -28022,6 +28028,10 @@ PrefabInstance:
       propertyPath: resultHandler
       value: 
       objectReference: {fileID: 135324865}
+    - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
+      propertyPath: itemClaimedKey
+      value: Chest21
+      objectReference: {fileID: 0}
     - target: {fileID: 5029496183253103719, guid: c157ffe36abd3434492d9cb310a18243, type: 3}
       propertyPath: confirmPurchasePanel
       value: 
@@ -28501,6 +28511,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   interactButton: {fileID: 0}
+  itemClaimedKey: Chest21
 --- !u!1001 &2062501872
 PrefabInstance:
   m_ObjectHideFlags: 0

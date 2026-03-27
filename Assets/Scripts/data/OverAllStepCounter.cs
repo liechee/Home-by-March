@@ -16,7 +16,7 @@ public class OverallStepCounter : MonoBehaviour
     public float refreshInterval = 0.2f;
 
     [Tooltip("Minimum step change before firing onStepsUpdated. Keep at 1.")]
-    public int  stepChangeThreshold = 1;
+    public int stepChangeThreshold = 1;
 
     [Tooltip("Log every StepCounterRequest result to the console.")]
     public bool debugStepQueries = false;
@@ -25,41 +25,41 @@ public class OverallStepCounter : MonoBehaviour
     public float diskSaveInterval = 10f;
 
     public StepData stepData;
-    public int      overallSteps;
-    public int      overallStepsBeforeToday;
-    public bool     cloudLoaded = false;
-    public string   stepDataJsonFilePath;
+    public int overallSteps;
+    public int overallStepsBeforeToday;
+    public bool cloudLoaded = false;
+    public string stepDataJsonFilePath;
 
     [HideInInspector] public bool isLoggingOut = false;
 
-    public static event Action          onLoaded;
-    public static event Action<int,int> onStepsUpdated; // (overall, daily)
+    public static event Action onLoaded;
+    public static event Action<int, int> onStepsUpdated; // (overall, daily)
 
     private static OverallStepCounter instance;
     private Coroutine refreshCoroutine;
 
-    private int  sessionGen = 0;
+    private int sessionGen = 0;
 
-    private int  appOpenDeviceSteps = 0;
-    private bool appOpenCaptured    = false;
+    private int appOpenDeviceSteps = 0;
+    private bool appOpenCaptured = false;
 
-    private int  signInDeviceSteps   = 0;
+    private int signInDeviceSteps = 0;
     private bool signedInThisSession = false;
 
-    private int  savedDailyBase = 0;
+    private int savedDailyBase = 0;
 
-    private bool beforeTodaySettled      = false;
-    private bool waitingForCloudData     = false;
+    private bool beforeTodaySettled = false;
+    private bool waitingForCloudData = false;
     private bool pendingLocalFireOnStart = false;
-    private bool offsetRecalibrated      = false;
+    private bool offsetRecalibrated = false;
 
     [HideInInspector] public bool initializingFreshData = false;
 
-    private bool  queryInFlight          = false;
-    private float queryDispatchTime      = 0f;
-    private const float QueryTimeout     = 5f;
+    private bool queryInFlight = false;
+    private float queryDispatchTime = 0f;
+    private const float QueryTimeout = 5f;
 
-    private int  lastKnownDeviceSteps    = 0;
+    private int lastKnownDeviceSteps = 0;
     private bool lastKnownDeviceCaptured = false;
 
     private float lastDiskSaveTime = 0f;
@@ -67,7 +67,7 @@ public class OverallStepCounter : MonoBehaviour
     private int verbosePostCloudPolls = 0;
 
     private const string OverallOffsetKey = "OverallStepOffset";
-    private const string DailyOffsetKey   = "DailyStepOffset";
+    private const string DailyOffsetKey = "DailyStepOffset";
 
     void Awake()
     {
@@ -97,10 +97,10 @@ public class OverallStepCounter : MonoBehaviour
 
     void Start()
     {
-        Debug.Log($"[StepCounter] Start — HasLoggedOut={PlayerPrefs.GetInt("HasLoggedOut",0)}, " +
+        Debug.Log($"[StepCounter] Start — HasLoggedOut={PlayerPrefs.GetInt("HasLoggedOut", 0)}, " +
                   $"initializingFreshData={initializingFreshData}, IsSignedIn={IsSignedIn()}, " +
-                  $"SuppressCloudRestore={PlayerPrefs.GetInt("SuppressCloudRestore",0)}, " +
-                  $"SuppressStepQuery={PlayerPrefs.GetInt("SuppressStepQuery",0)}, " +
+                  $"SuppressCloudRestore={PlayerPrefs.GetInt("SuppressCloudRestore", 0)}, " +
+                  $"SuppressStepQuery={PlayerPrefs.GetInt("SuppressStepQuery", 0)}, " +
                   $"fileExists={File.Exists(stepDataJsonFilePath)}, " +
                   $"waitingForCloud={waitingForCloudData}");
 
@@ -114,7 +114,7 @@ public class OverallStepCounter : MonoBehaviour
             onLoaded?.Invoke();
         }
 
-        bool signedIn      = IsSignedIn();
+        bool signedIn = IsSignedIn();
         bool suppressCloud = PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1;
 
         if (signedIn && !suppressCloud)
@@ -137,7 +137,7 @@ public class OverallStepCounter : MonoBehaviour
         if (IsSignedIn() && PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 0)
         {
             if (!cloudLoaded) _ = LoadStepDataFromCloud();
-            else              GetOverallSteps();
+            else GetOverallSteps();
         }
 
         if (PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0 && refreshCoroutine == null)
@@ -177,9 +177,9 @@ public class OverallStepCounter : MonoBehaviour
     private void CommitCurrentStateToDisk()
     {
         if (isLoggingOut) return;
-        stepData.lastSaveTime  = DateTime.Today.ToString("yyyy-MM-dd");
+        stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
         stepData.numberOfSteps = overallSteps;
-        stepData.overallSteps  = overallSteps;
+        stepData.overallSteps = overallSteps;
 
         if (lastKnownDeviceCaptured)
         {
@@ -214,31 +214,31 @@ public class OverallStepCounter : MonoBehaviour
 
         if (beforeTodaySettled)
         {
-            queryInFlight     = true;
+            queryInFlight = true;
             queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
             return;
         }
 
         DateTime lastSave = DateTime.Parse(stepData.lastSaveTime).Date;
-        int      days     = GetDaysSinceLastSave();
+        int days = GetDaysSinceLastSave();
 
         if (days == 0)
         {
             overallStepsBeforeToday = stepData.numberOfSteps > 0
                 ? stepData.numberOfSteps - GetEstimatedTodayStepsFromDisk() : 0;
             beforeTodaySettled = true;
-            queryInFlight      = true;
-            queryDispatchTime  = Time.realtimeSinceStartup;
+            queryInFlight = true;
+            queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
         }
         else if (days == 1)
         {
-            savedDailyBase          = 0;
+            savedDailyBase = 0;
             overallStepsBeforeToday = stepData.numberOfSteps;
-            beforeTodaySettled      = true;
-            queryInFlight           = true;
-            queryDispatchTime       = Time.realtimeSinceStartup;
+            beforeTodaySettled = true;
+            queryInFlight = true;
+            queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
         }
         else if (days <= 10)
@@ -248,9 +248,9 @@ public class OverallStepCounter : MonoBehaviour
             {
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = snapshot + range;
-                beforeTodaySettled      = true;
-                queryInFlight           = true;
-                queryDispatchTime       = Time.realtimeSinceStartup;
+                beforeTodaySettled = true;
+                queryInFlight = true;
+                queryDispatchTime = Time.realtimeSinceStartup;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -260,9 +260,9 @@ public class OverallStepCounter : MonoBehaviour
             {
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = range;
-                beforeTodaySettled      = true;
-                queryInFlight           = true;
-                queryDispatchTime       = Time.realtimeSinceStartup;
+                beforeTodaySettled = true;
+                queryInFlight = true;
+                queryDispatchTime = Time.realtimeSinceStartup;
                 QueryTodayAndUpdate(gen);
             }).Execute();
         }
@@ -277,7 +277,7 @@ public class OverallStepCounter : MonoBehaviour
 
             if (!isLoggingOut)
             {
-                lastKnownDeviceSteps    = deviceNow;
+                lastKnownDeviceSteps = deviceNow;
                 lastKnownDeviceCaptured = true;
             }
 
@@ -288,19 +288,19 @@ public class OverallStepCounter : MonoBehaviour
             {
                 offsetRecalibrated = true;
                 int todayAlreadyRecorded = Math.Max(0, overallSteps - overallStepsBeforeToday);
-                int newOffset            = Math.Max(0, deviceNow - todayAlreadyRecorded);
+                int newOffset = Math.Max(0, deviceNow - todayAlreadyRecorded);
                 PlayerPrefs.SetInt(OverallOffsetKey, newOffset);
                 PlayerPrefs.Save();
                 Debug.Log($"[RECAL] Offset recalibrated: deviceNow={deviceNow}, todayRecorded={todayAlreadyRecorded}, offset={newOffset}");
             }
 
-            int prev     = overallSteps;
+            int prev = overallSteps;
             int todayNet = CalcTodayNetSteps(deviceNow);
             overallSteps = overallStepsBeforeToday + todayNet;
-            int daily    = CalcDailySteps(deviceNow);
+            int daily = CalcDailySteps(deviceNow);
 
             int overallDelta = Math.Abs(overallSteps - prev);
-            int dailyDelta   = Math.Abs(daily - stepData.dailySteps);
+            int dailyDelta = Math.Abs(daily - stepData.dailySteps);
 
             // Verbose post-cloud logging so you can verify daily is counting
             bool verbose = debugStepQueries || verbosePostCloudPolls > 0;
@@ -387,10 +387,10 @@ public class OverallStepCounter : MonoBehaviour
         if (isLoggingOut) return;
         if (gen >= 0 && IsStale(gen)) return;
 
-        stepData.lastSaveTime  = DateTime.Today.ToString("yyyy-MM-dd");
+        stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
         stepData.numberOfSteps = overallSteps;
-        stepData.overallSteps  = overallSteps;
-        stepData.dailySteps    = CalcDailySteps(todayDeviceSteps);
+        stepData.overallSteps = overallSteps;
+        stepData.dailySteps = CalcDailySteps(todayDeviceSteps);
 
         float now = Time.realtimeSinceStartup;
         if (forceWrite || (now - lastDiskSaveTime) >= diskSaveInterval)
@@ -433,7 +433,7 @@ public class OverallStepCounter : MonoBehaviour
 
         if (!signedInThisSession && appOpenCaptured)
         {
-            signInDeviceSteps   = appOpenDeviceSteps;
+            signInDeviceSteps = appOpenDeviceSteps;
             signedInThisSession = true;
         }
 
@@ -447,7 +447,7 @@ public class OverallStepCounter : MonoBehaviour
             string json = await CloudSaver.LoadDataFromCloud("stepData");
             if (IsStale(gen) || isLoggingOut) return;
 
-            int  preservedBaseline = stepData?.baselineSteps ?? 0;
+            int preservedBaseline = stepData?.baselineSteps ?? 0;
 
             stepData = JsonUtility.FromJson<StepData>(json);
             Debug.Log($"[CLOUD] Raw: overall={stepData.overallSteps}, daily={stepData.dailySteps}, last={stepData.lastSaveTime}");
@@ -459,8 +459,8 @@ public class OverallStepCounter : MonoBehaviour
             }
 
             DateTime cloudDate = DateTime.Parse(stepData.lastSaveTime).Date;
-            int      daysSince = (DateTime.Today - cloudDate).Days;
-            int      cloudBase = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
+            int daysSince = (DateTime.Today - cloudDate).Days;
+            int cloudBase = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
 
             // ── DIAGNOSTIC: confirm which path and what daily value cloud has ──────
             Debug.Log($"[CLOUD] daysSince={daysSince}, cloudBase={cloudBase}, " +
@@ -468,15 +468,15 @@ public class OverallStepCounter : MonoBehaviour
                       $"cloudDate={cloudDate:yyyy-MM-dd}, today={DateTime.Today:yyyy-MM-dd}");
             Debug.Log($"[CLOUD] Path → {(daysSince == 0 ? "SameDay (daily preserved)" : daysSince == 1 ? "NewDay (daily=0)" : "MultiDay (daily=0)")}");
 
-            if      (daysSince == 0) ApplyCloudSameDay(cloudBase, gen, localDailyBeforeCloud);
+            if (daysSince == 0) ApplyCloudSameDay(cloudBase, gen, localDailyBeforeCloud);
             else if (daysSince == 1) ApplyCloudNewDay(cloudBase, gen);
-            else                     ApplyCloudMultiDayGap(cloudBase, cloudDate, gen);
+            else ApplyCloudMultiDayGap(cloudBase, cloudDate, gen);
         }
         catch (Exception e)
         {
             Debug.LogError($"[CLOUD] Load failed: {e.Message}");
             waitingForCloudData = false;
-            cloudLoaded         = false;
+            cloudLoaded = false;
 
             if (stepData != null) { onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
             else LoadStepData();
@@ -500,7 +500,7 @@ public class OverallStepCounter : MonoBehaviour
         }
 
         int localDailyAtSignIn = Math.Max(0, localDailyBeforeCloud);
-        int preCloudAppOpen    = appOpenCaptured ? appOpenDeviceSteps : -1;
+        int preCloudAppOpen = appOpenCaptured ? appOpenDeviceSteps : -1;
 
         new StepCounterRequest().Since(DateTime.Today).OnQuerySuccess((deviceNow) =>
         {
@@ -513,16 +513,16 @@ public class OverallStepCounter : MonoBehaviour
                 Debug.LogWarning("[CLOUD] appOpenDeviceSteps not captured — using deviceNow as fallback.");
 
             appOpenDeviceSteps = deviceNow;
-            appOpenCaptured    = true;
+            appOpenCaptured = true;
 
-            overallSteps            = cloudBase;
+            overallSteps = cloudBase;
             overallStepsBeforeToday = cloudBase;
-            beforeTodaySettled      = true;
+            beforeTodaySettled = true;
 
             int offlineSteps = preCloudAppOpen >= 0 ? Math.Max(0, deviceNow - preCloudAppOpen) : 0;
             int effectiveBase = Math.Max(cloudSavedDaily, localDailyAtSignIn);
 
-            savedDailyBase      = effectiveBase;
+            savedDailyBase = effectiveBase;
             stepData.dailySteps = effectiveBase + offlineSteps;
 
             Debug.Log($"[CLOUD SameDay] cloudDaily={cloudSavedDaily}, localDaily={localDailyAtSignIn}, " +
@@ -543,15 +543,15 @@ public class OverallStepCounter : MonoBehaviour
             PlayerPrefs.Save();
 
             appOpenDeviceSteps = deviceNow;
-            appOpenCaptured    = true;
+            appOpenCaptured = true;
 
-            overallSteps            = cloudBase;
+            overallSteps = cloudBase;
             overallStepsBeforeToday = cloudBase;
-            beforeTodaySettled      = true;
+            beforeTodaySettled = true;
 
             int todaySteps = Math.Max(0, deviceNow);
-            savedDailyBase       = todaySteps;
-            stepData.dailySteps  = todaySteps;
+            savedDailyBase = todaySteps;
+            stepData.dailySteps = todaySteps;
 
             FinalizeCloudLoad();
         }).Execute();
@@ -572,15 +572,15 @@ public class OverallStepCounter : MonoBehaviour
                 PlayerPrefs.Save();
 
                 appOpenDeviceSteps = deviceNow;
-                appOpenCaptured    = true;
+                appOpenCaptured = true;
 
-                overallSteps            = accumulated;
+                overallSteps = accumulated;
                 overallStepsBeforeToday = accumulated;
-                beforeTodaySettled      = true;
+                beforeTodaySettled = true;
 
                 int todaySteps = Math.Max(0, deviceNow);
-                savedDailyBase       = todaySteps;
-                stepData.dailySteps  = todaySteps;
+                savedDailyBase = todaySteps;
+                stepData.dailySteps = todaySteps;
 
                 FinalizeCloudLoad();
             }).Execute();
@@ -591,9 +591,9 @@ public class OverallStepCounter : MonoBehaviour
     {
         if (isLoggingOut) return;
 
-        stepData.lastSaveTime  = DateTime.Today.ToString("yyyy-MM-dd");
+        stepData.lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd");
         stepData.numberOfSteps = overallSteps;
-        stepData.overallSteps  = overallSteps;
+        stepData.overallSteps = overallSteps;
 
         WriteToDisk();
 
@@ -604,9 +604,9 @@ public class OverallStepCounter : MonoBehaviour
         PlayerPrefs.DeleteKey("SuppressCloudRestore");
         PlayerPrefs.Save();
 
-        cloudLoaded          = true;
-        waitingForCloudData  = false;
-        offsetRecalibrated   = true;
+        cloudLoaded = true;
+        waitingForCloudData = false;
+        offsetRecalibrated = true;
         verbosePostCloudPolls = 10; // Log the next 10 polls 
 
         signedInThisSession = false;
@@ -656,7 +656,7 @@ public class OverallStepCounter : MonoBehaviour
 
         stepData = JsonUtility.FromJson<StepData>(File.ReadAllText(stepDataJsonFilePath)) ?? new StepData();
 
-        overallSteps            = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
+        overallSteps = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
         overallStepsBeforeToday = stepData.numberOfSteps;
 
         bool isNewDay = !string.IsNullOrEmpty(stepData.lastSaveTime) &&
@@ -666,7 +666,7 @@ public class OverallStepCounter : MonoBehaviour
         if (isNewDay)
         {
             overallStepsBeforeToday = stepData.numberOfSteps;
-            beforeTodaySettled      = false;
+            beforeTodaySettled = false;
         }
 
         Debug.Log($"[LOAD] overall={overallSteps}, daily={stepData.dailySteps}, " +
@@ -689,12 +689,12 @@ public class OverallStepCounter : MonoBehaviour
         stepData = new StepData
         {
             registrationTime = DateTime.Today.ToString("yyyy-MM-dd"),
-            lastSaveTime     = DateTime.Today.ToString("yyyy-MM-dd")
+            lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd")
         };
-        overallSteps            = 0;
+        overallSteps = 0;
         overallStepsBeforeToday = 0;
-        savedDailyBase          = 0;
-        stepData.baselineSteps  = 0;
+        savedDailyBase = 0;
+        stepData.baselineSteps = 0;
 
         onStepsUpdated?.Invoke(0, 0);
 
@@ -721,9 +721,9 @@ public class OverallStepCounter : MonoBehaviour
         stepData = new StepData
         {
             registrationTime = DateTime.Today.ToString("yyyy-MM-dd"),
-            lastSaveTime     = DateTime.Today.ToString("yyyy-MM-dd")
+            lastSaveTime = DateTime.Today.ToString("yyyy-MM-dd")
         };
-        overallSteps   = 0;
+        overallSteps = 0;
         savedDailyBase = 0;
         onStepsUpdated?.Invoke(0, 0);
 
@@ -733,9 +733,9 @@ public class OverallStepCounter : MonoBehaviour
             if (IsStale(gen)) return;
 
             stepData.baselineSteps = deviceNow;
-            appOpenDeviceSteps     = deviceNow;
-            appOpenCaptured        = true;
-            beforeTodaySettled     = true;
+            appOpenDeviceSteps = deviceNow;
+            appOpenCaptured = true;
+            beforeTodaySettled = true;
 
             PlayerPrefs.DeleteKey("HasLoggedOut");
             PlayerPrefs.DeleteKey("SuppressStepQuery");
@@ -755,25 +755,25 @@ public class OverallStepCounter : MonoBehaviour
         sessionGen++;
         Debug.Log($"[RESET] Gen → {sessionGen}. All in-flight callbacks invalidated.");
 
-        isLoggingOut            = true;
-        stepData                = new StepData();
-        overallSteps            = 0;
+        isLoggingOut = true;
+        stepData = new StepData();
+        overallSteps = 0;
         overallStepsBeforeToday = 0;
-        cloudLoaded             = false;
-        beforeTodaySettled      = false;
-        waitingForCloudData     = false;
-        savedDailyBase          = 0;
-        appOpenDeviceSteps      = 0;
-        appOpenCaptured         = false;
-        signInDeviceSteps       = 0;
-        signedInThisSession     = false;
+        cloudLoaded = false;
+        beforeTodaySettled = false;
+        waitingForCloudData = false;
+        savedDailyBase = 0;
+        appOpenDeviceSteps = 0;
+        appOpenCaptured = false;
+        signInDeviceSteps = 0;
+        signedInThisSession = false;
         pendingLocalFireOnStart = false;
-        initializingFreshData   = false;
-        offsetRecalibrated      = false;
-        queryInFlight           = false;
-        lastKnownDeviceSteps    = 0;
+        initializingFreshData = false;
+        offsetRecalibrated = false;
+        queryInFlight = false;
+        lastKnownDeviceSteps = 0;
         lastKnownDeviceCaptured = false;
-        appOpenTcs              = new TaskCompletionSource<int>();
+        appOpenTcs = new TaskCompletionSource<int>();
 
         StopRefreshCoroutine();
 
@@ -827,21 +827,29 @@ public class OverallStepCounter : MonoBehaviour
 
     private void CaptureAppOpenSteps()
     {
+        _ = TimeoutAppOpenTcs(2f);
         new StepCounterRequest().Since(DateTime.Today).OnQuerySuccess((n) =>
         {
             if (!appOpenCaptured)
             {
                 appOpenDeviceSteps = n;
-                appOpenCaptured    = true;
+                appOpenCaptured = true;
                 Debug.Log($"[SESSION] App-open steps captured: {n}");
             }
             if (!lastKnownDeviceCaptured)
             {
-                lastKnownDeviceSteps    = n;
+                lastKnownDeviceSteps = n;
                 lastKnownDeviceCaptured = true;
             }
             appOpenTcs.TrySetResult(n);
         }).Execute();
+    }
+    private async Task TimeoutAppOpenTcs(float seconds)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(seconds));
+        appOpenTcs.TrySetResult(appOpenDeviceSteps);
+        if (!appOpenCaptured)
+            Debug.LogWarning("[SESSION] appOpenTcs timed out — cloud load unblocked without sensor reading.");
     }
 
     private void WriteToDisk()
@@ -853,22 +861,22 @@ public class OverallStepCounter : MonoBehaviour
 
     private void ZeroState()
     {
-        stepData                = new StepData();
-        overallSteps            = 0;
+        stepData = new StepData();
+        overallSteps = 0;
         overallStepsBeforeToday = 0;
-        beforeTodaySettled      = false;
-        waitingForCloudData     = false;
-        savedDailyBase          = 0;
-        appOpenDeviceSteps      = 0;
-        appOpenCaptured         = false;
-        signInDeviceSteps       = 0;
-        signedInThisSession     = false;
+        beforeTodaySettled = false;
+        waitingForCloudData = false;
+        savedDailyBase = 0;
+        appOpenDeviceSteps = 0;
+        appOpenCaptured = false;
+        signInDeviceSteps = 0;
+        signedInThisSession = false;
         pendingLocalFireOnStart = false;
-        offsetRecalibrated      = false;
-        queryInFlight           = false;
-        lastKnownDeviceSteps    = 0;
+        offsetRecalibrated = false;
+        queryInFlight = false;
+        lastKnownDeviceSteps = 0;
         lastKnownDeviceCaptured = false;
-        appOpenTcs              = new TaskCompletionSource<int>();
+        appOpenTcs = new TaskCompletionSource<int>();
         StopRefreshCoroutine();
     }
 

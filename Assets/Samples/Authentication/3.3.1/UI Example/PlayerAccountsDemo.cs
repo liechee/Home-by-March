@@ -6,11 +6,15 @@ using UnityEngine.UI;
 using TMPro;
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
-    class PlayerAccountsDemo : MonoBehaviour
+    public class PlayerAccountsDemo : MonoBehaviour
     {
         [SerializeField] TMP_Text m_StatusText;
         [SerializeField] GameObject m_SignOut;
         [SerializeField] GameObject m_SignIn;
+
+        private TMP_Text m_ExternalStatusText;
+        private GameObject m_ExternalSignOut;
+        private GameObject m_ExternalSignIn;
 
         private bool _isSigningIn = false;
         private string m_ExternalIds = "";
@@ -113,6 +117,14 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             Application.OpenURL(PlayerAccountService.Instance.AccountPortalUrl);
         }
 
+        public void SetExternalUiTargets(TMP_Text statusText, GameObject signOutButton, GameObject signInButton)
+        {
+            m_ExternalStatusText = statusText;
+            m_ExternalSignOut = signOutButton;
+            m_ExternalSignIn = signInButton;
+            UpdateUI();
+        }
+
    
         private void OnFullySignedIn()
         {
@@ -180,22 +192,34 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         private void UpdateUI()
         {
-            if (m_StatusText == null || m_SignOut == null || m_SignIn == null)
-            {
-                Debug.LogWarning("[Auth] UI references missing.");
-                return;
-            }
-
             bool signedIn = AuthenticationService.Instance.IsSignedIn;
             Debug.Log($"[Auth] UpdateUI — IsSignedIn: {signedIn}");
-
-            m_SignOut.SetActive(signedIn);
-            m_SignIn.SetActive(!signedIn);
 
             var sb = new StringBuilder();
             sb.AppendLine(signedIn ? "Signed in" : "Not signed in");
             if (signedIn) sb.AppendLine(GetPlayerInfoText());
-            m_StatusText.text = sb.ToString();
+
+            string status = sb.ToString();
+            ApplyUiState(m_StatusText, m_SignOut, m_SignIn, signedIn, status);
+            ApplyUiState(m_ExternalStatusText, m_ExternalSignOut, m_ExternalSignIn, signedIn, status);
+        }
+
+        private static void ApplyUiState(TMP_Text statusText, GameObject signOut, GameObject signIn, bool signedIn, string status)
+        {
+            if (signOut != null)
+            {
+                signOut.SetActive(signedIn);
+            }
+
+            if (signIn != null)
+            {
+                signIn.SetActive(!signedIn);
+            }
+
+            if (statusText != null)
+            {
+                statusText.text = status;
+            }
         }
 
 

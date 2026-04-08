@@ -40,7 +40,7 @@ public class PlayerData : MonoBehaviour
 
     public PlayerData()
     {
-        playerName = "New Player";
+        playerName = "";
         level = 1;
         health = 100;
         attack = 10;

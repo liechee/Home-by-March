@@ -70,23 +70,34 @@ public class UserLevel : MonoBehaviour
         if (stepCounter == null)
             stepCounter = FindObjectOfType<OverallStepCounter>();
 
+        if (playerData == null)
+            playerData = FindObjectOfType<PlayerData>();
+
         // Idempotent subscription to avoid duplicate listeners after scene/UI toggles.
         OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
         OverallStepCounter.onLoaded -= OnStepDataLoaded;
         OverallStepCounter.onStepsUpdated += OnStepsUpdated;
         OverallStepCounter.onLoaded += OnStepDataLoaded;
+
+        PlayerData.onPlayerDataChanged -= OnPlayerDataChanged;
+        PlayerData.onPlayerDataChanged += OnPlayerDataChanged;
+
+        // Ensure text reflects latest player profile as soon as this UI appears.
+        RefreshUI();
     }
 
     void OnDisable()
     {
         OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
         OverallStepCounter.onLoaded -= OnStepDataLoaded;
+        PlayerData.onPlayerDataChanged -= OnPlayerDataChanged;
     }
 
     void OnDestroy()
     {
         OverallStepCounter.onStepsUpdated -= OnStepsUpdated;
         OverallStepCounter.onLoaded       -= OnStepDataLoaded;
+        PlayerData.onPlayerDataChanged    -= OnPlayerDataChanged;
     }
 
     private void OnStepsUpdated(int newOverall, int newDaily)
@@ -105,6 +116,18 @@ public class UserLevel : MonoBehaviour
         if (stepCounter == null) return;
         ApplySteps(stepCounter.overallSteps,
                    stepCounter.stepData != null ? stepCounter.stepData.dailySteps : 0);
+    }
+
+    private void OnPlayerDataChanged()
+    {
+        if (playerData == null)
+            playerData = FindObjectOfType<PlayerData>();
+
+        if (playerData == null)
+            return;
+
+        RecalculateLevelAndXP();
+        RefreshUI();
     }
 
     private void ApplySteps(int newOverall, int newDaily)

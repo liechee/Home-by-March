@@ -21,13 +21,6 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
         if (inventory2         == null) Debug.LogWarning("[CloudSync] Inventory2 not found!");
     }
 
-    async void Start()
-    {
- 
-        await LoadNonStepDataFromCloud();
-    }
-
-
     async void OnApplicationQuit()
     {
         if (!IsSafeToProceed("OnApplicationQuit")) return;
@@ -62,6 +55,11 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
 
     public async void LoadFromCloud()
     {
+        await LoadFromCloudAsync();
+    }
+
+    public async System.Threading.Tasks.Task LoadFromCloudAsync()
+    {
         if (!IsSafeToProceed("LoadFromCloud")) return;
 
         Debug.Log("[CloudSync] ── LoadFromCloud (manual) ──────────────────────");
@@ -79,6 +77,12 @@ public class PlayerPrefsCloudSyncButton : MonoBehaviour
 
     private async Task SaveNonStepDataToCloud()
     {
+        if (PlayerPrefs.GetInt("PlayerSignedIn", 0) != 1)
+        {
+            Debug.LogWarning("[CloudSync] SaveNonStepDataToCloud skipped — signed-in restore is not complete.");
+            return;
+        }
+
         await PlayerPrefsCloudSync.SaveAllToCloud();
         Debug.Log("[CloudSync] PlayerPrefs saved.");
 

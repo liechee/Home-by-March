@@ -57,6 +57,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         [SerializeField] PlayerData                 m_PlayerData;
 
         private bool _waitingForPortalReturn = false;
+        private bool _cloudLoadTriggeredForSignedInSession = false;
 
         // ─────────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,12 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private void Start()
         {
             SetWaitingText(false);
+
+            // Ensure buttons have safe default state before auth state is known
+            // (prevents showing unauthenticated buttons on first frame if scene loads faster than auth)
+            if (m_SignOutBtn != null) m_SignOutBtn.SetActive(false);
+            if (m_SignInBtn != null) m_SignInBtn.SetActive(false);
+            Debug.Log("[Scene2AuthUI] Buttons hidden during init.");
 
             // Clean re-subscribe after all Awakes have run (guards against OnEnable
             // firing before AuthManager.Awake sets Instance)
@@ -120,10 +127,17 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             if (elapsed >= kTimeout)
             {
                 Debug.LogWarning("[Scene2AuthUI] Timed out waiting for AuthManager — forcing refresh.");
-                RefreshUI();
+                OnAuthStateChanged();
+                yield break;
             }
-            // Normal path: AuthManager fires NotifyStateChanged() immediately after
-            // IsReady = true, which calls OnAuthStateChanged → RefreshUI for us.
+
+            // Apply the current auth state explicitly once ready.
+            // This avoids missing cloud-load trigger if the initial auth event fired
+            // before this component finished subscribing.
+            Debug.Log($"[Scene2AuthUI] AuthManager ready. CurrentMode={AuthManager.Instance.CurrentMode}, " +
+                      $"IsSignedIn={AuthManager.Instance.IsSignedIn}, " +
+                      $"AuthService.IsSignedIn={Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn}");
+            OnAuthStateChanged();
         }
 
         // ── Auth state → UI ───────────────────────────────────────────────────────
@@ -132,15 +146,23 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         {
             RefreshUI();
 
-            // Whenever we land on a signed-in state, trigger cloud loads
-            if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
+            if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn)
             {
+                _cloudLoadTriggeredForSignedInSession = false;
+                return;
+            }
+
+            // Whenever we land on a signed-in state, trigger cloud loads
+            if (!_cloudLoadTriggeredForSignedInSession)
+            {
+                _cloudLoadTriggeredForSignedInSession = true;
+
                 if (_waitingForPortalReturn)
                 {
                     _waitingForPortalReturn = false;
                     SetWaitingText(false);
                 }
-                TriggerCloudLoads();
+                _ = TriggerCloudLoadsAsync();
             }
         }
 
@@ -151,6 +173,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             bool isGuest    = AuthManager.Instance.IsGuest;
             bool isSignedIn = AuthManager.Instance.IsSignedIn;
             bool hasSession = isGuest || isSignedIn;
+
+            Debug.Log($"[Scene2AuthUI] RefreshUI — isGuest={isGuest}, isSignedIn={isSignedIn}, " +
+                      $"hasSession={hasSession}, _waitingForPortalReturn={_waitingForPortalReturn}");
 
             // ── Status text — mirrors PlayerAccountsDemo.UpdateUI() logic ─────────
             if (m_StatusText != null)
@@ -178,11 +203,19 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             // ── Button visibility — mirrors PlayerAccountsDemo.ApplyUiState() ─────
             // Sign-out: visible whenever any session exists (guest OR signed-in)
             if (m_SignOutBtn != null)
-                m_SignOutBtn.SetActive(hasSession);
+            {
+                bool signOutActive = hasSession;
+                m_SignOutBtn.SetActive(signOutActive);
+                Debug.Log($"[Scene2AuthUI] Sign-out button: {(signOutActive ? "ACTIVE" : "INACTIVE")}");
+            }
 
-            // Sign-in: visible in guest mode only; hidden once they have an account
+            // Sign-in: visible whenever not signed in (guest OR none)
             if (m_SignInBtn != null)
-                m_SignInBtn.SetActive(isGuest && !_waitingForPortalReturn);
+            {
+                bool signInActive = !isSignedIn && !_waitingForPortalReturn;
+                m_SignInBtn.SetActive(signInActive);
+                Debug.Log($"[Scene2AuthUI] Sign-in button: {(signInActive ? "ACTIVE" : "INACTIVE")}");
+            }
         }
 
         // ── Button callbacks — wire these up in the Inspector ────────────────────
@@ -212,28 +245,54 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         // ── Cloud loads ───────────────────────────────────────────────────────────
 
-        private void TriggerCloudLoads()
+        private async System.Threading.Tasks.Task TriggerCloudLoadsAsync()
         {
-            PlayerPrefs.SetInt("PlayerSignedIn", 1);
-            PlayerPrefs.Save();
+            ResolveCloudLoadTargets();
 
             if (m_StepCounter != null && !m_StepCounter.cloudLoaded)
             {
                 Debug.Log("[Scene2AuthUI] Triggering step data cloud load.");
-                _ = m_StepCounter.LoadStepDataFromCloud();
+                await m_StepCounter.LoadStepDataFromCloud();
             }
 
             if (m_SyncButton != null)
             {
                 Debug.Log("[Scene2AuthUI] Triggering non-step cloud load.");
-                m_SyncButton.LoadFromCloud();
+                await m_SyncButton.LoadFromCloudAsync();
             }
-
-            if (m_PlayerData != null)
+            else if (m_PlayerData != null)
             {
                 Debug.Log("[Scene2AuthUI] Triggering player data cloud load.");
-                m_PlayerData.LoadPlayerDataFromCloud();
+                await m_PlayerData.LoadPlayerDataFromCloud();
             }
+
+            if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn &&
+                (m_StepCounter == null || m_StepCounter.cloudLoaded))
+            {
+                PlayerPrefs.SetInt("PlayerSignedIn", 1);
+                PlayerPrefs.Save();
+            }
+        }
+
+        private void ResolveCloudLoadTargets()
+        {
+            // Mirror PlayerAccountsDemo's FindObjectOfType pattern so auth/data loading
+            // still works even if one inspector field is left unassigned.
+            if (m_StepCounter == null)
+                m_StepCounter = FindObjectOfType<OverallStepCounter>();
+
+            if (m_SyncButton == null)
+                m_SyncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
+
+            if (m_PlayerData == null)
+                m_PlayerData = FindObjectOfType<PlayerData>();
+
+            if (m_StepCounter == null)
+                Debug.LogWarning("[Scene2AuthUI] OverallStepCounter not found — step cloud load skipped.");
+            if (m_SyncButton == null)
+                Debug.LogWarning("[Scene2AuthUI] PlayerPrefsCloudSyncButton not found — non-step cloud load skipped.");
+            if (m_PlayerData == null)
+                Debug.LogWarning("[Scene2AuthUI] PlayerData not found — player data cloud load skipped.");
         }
 
         // ── Navigation ────────────────────────────────────────────────────────────

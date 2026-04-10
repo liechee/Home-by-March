@@ -10,15 +10,21 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
     /// <summary>
     /// Placed in Scene 2 only. No DontDestroyOnLoad.
     ///
-    /// Responsibilities:
-    ///   • Initialize Unity Services
-    ///   • Restore guest name OR complete Unity sign-in from what Scene 1 wrote to PlayerPrefs
-    ///   • Expose IsReady so Scene2AuthUI knows when it's safe to draw the UI
-    ///   • Fire OnStateChanged whenever auth state changes so all listeners refresh
+    /// On Scene 2 load, reads the PlayerPrefs handoff from Scene1LoginUI:
+    ///   "PendingLoginMode" = "Guest"  → restore guest name, no network call
+    ///   "PendingLoginMode" = "Unity"  → AuthenticationService is already signed in
+    ///                                    (Scene1LoginUI completed sign-in before loading)
     ///
-    /// PlayerPrefs handoff keys (written by Scene1LoginUI, consumed here):
-    ///   "PendingLoginMode" = "Guest" | "Unity"
-    ///   "GuestName"        = display name (guest path only)
+    /// For session persistence across app restarts:
+    ///   Unity Authentication automatically saves a session token to the device.
+    ///   Scene1LoginUI restores via SignInAnonymouslyAsync() when a cached token exists.
+    ///   By the time Scene 2 loads, AuthenticationService.IsSignedIn is already true.
+    ///   AuthManager just reads that state — no extra sign-in calls needed here.
+    ///
+    /// Guest → Unity account upgrade (from Scene 2):
+    ///   Guest taps Sign In → opens PlayerAccount portal → app regains focus
+    ///   → StartUnitySignInAsync() exchanges the new access token with AuthenticationService
+    ///   → session token is written to disk → next relaunch restores silently
     /// </summary>
     public class AuthManager : MonoBehaviour
     {
@@ -30,26 +36,19 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         public LoginMode CurrentMode { get; private set; } = LoginMode.None;
 
-        /// <summary>Guest: entered with a name but no Unity account.</summary>
         public bool IsGuest    => CurrentMode == LoginMode.Guest;
-
-        /// <summary>Fully signed into a Unity account.</summary>
         public bool IsSignedIn => CurrentMode == LoginMode.UnityAccount
                                   && AuthenticationService.Instance.IsSignedIn;
 
-        /// <summary>True the moment InitAsync finishes — safe to read all state after this.</summary>
+        /// <summary>True once InitAsync fully finishes. Scene2AuthUI waits on this.</summary>
         public bool IsReady { get; private set; } = false;
 
-        public string GuestName { get; private set; } = "";
+        public string GuestName   { get; private set; } = "";
         public string ExternalIds { get; private set; } = "";
-        public string PlayerId  => AuthenticationService.Instance.IsSignedIn
-                                   ? AuthenticationService.Instance.PlayerId : "";
+        public string PlayerId    => AuthenticationService.Instance.IsSignedIn
+                                     ? AuthenticationService.Instance.PlayerId : "";
 
         // ── Events ───────────────────────────────────────────────────────────────
-        /// <summary>
-        /// Fired after every auth state change, including the initial load.
-        /// Scene2AuthUI subscribes here to refresh its UI.
-        /// </summary>
         public event Action OnStateChanged;
 
         // ── Internal ─────────────────────────────────────────────────────────────
@@ -60,6 +59,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         public const string PrefGuestName = "GuestName";
 
         // ─────────────────────────────────────────────────────────────────────────
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -77,37 +77,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             await UnityServices.InitializeAsync();
             _servicesReady = true;
 
-            // ── Unity Auth service events ─────────────────────────────────────────
-            AuthenticationService.Instance.SignedIn += () =>
-            {
-                CurrentMode  = LoginMode.UnityAccount;
-                ExternalIds  = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
-                Debug.Log($"[AuthManager] SignedIn — PlayerID: {PlayerId}");
-                NotifyStateChanged();
-            };
-
-            AuthenticationService.Instance.SignedOut += () =>
-            {
-                Debug.Log("[AuthManager] Signed out.");
-                if (CurrentMode == LoginMode.UnityAccount) CurrentMode = LoginMode.None;
-                ExternalIds = "";
-                NotifyStateChanged();
-            };
-
-            AuthenticationService.Instance.SignInFailed += err =>
-            {
-                Debug.LogError($"[AuthManager] Sign-in failed: {err}");
-                NotifyStateChanged();
-            };
-
-            AuthenticationService.Instance.Expired += () =>
-            {
-                Debug.LogWarning("[AuthManager] Session expired.");
-                CurrentMode = LoginMode.None;
-                ExternalIds = "";
-                NotifyStateChanged();
-            };
-
+            // ── Unity Auth events ─────────────────────────────────────────────────
+            AuthenticationService.Instance.SignedIn += OnAuthSignedIn;
+            AuthenticationService.Instance.SignedOut += OnAuthSignedOut;
+            AuthenticationService.Instance.SignInFailed += OnAuthSignInFailed;
+            AuthenticationService.Instance.Expired += OnAuthExpired;
             PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
 
             // ── Read Scene 1's handoff ────────────────────────────────────────────
@@ -115,43 +89,97 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             if (pendingMode == "Guest")
             {
+                // No network call needed — just restore the name
                 GuestName   = PlayerPrefs.GetString(PrefGuestName, "Guest");
                 CurrentMode = LoginMode.Guest;
                 PlayerPrefs.DeleteKey(PrefLoginMode);
-                Debug.Log($"[AuthManager] Guest session started: {GuestName}");
+                Debug.Log($"[AuthManager] Guest session: {GuestName}");
             }
-            else if (pendingMode == "Unity" || AuthenticationService.Instance.IsSignedIn)
+            else if (pendingMode == "Unity")
             {
                 PlayerPrefs.DeleteKey(PrefLoginMode);
 
+                // Scene1LoginUI already completed sign-in (SignInWithUnityAsync or
+                // cached-token restore) before loading this scene.
+                // AuthenticationService.IsSignedIn should already be true.
                 if (AuthenticationService.Instance.IsSignedIn)
                 {
                     CurrentMode = LoginMode.UnityAccount;
                     ExternalIds = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
-                    Debug.Log("[AuthManager] Unity session already active.");
+                    Debug.Log($"[AuthManager] Unity account session active. PlayerID: {PlayerId}");
                 }
                 else
                 {
-                    await CompleteUnitySignInAsync();
+                    // Edge case: Scene loaded before auth finished (very slow device).
+                    // Wait briefly for the SignedIn event to fire on its own.
+                    Debug.LogWarning("[AuthManager] Unity pending but not signed in yet — waiting for event.");
                 }
             }
             else
             {
-                Debug.Log("[AuthManager] No pending login — idle.");
+                // No handoff key — could be app relaunch or direct Scene 2 launch.
+                if (AuthenticationService.Instance.IsSignedIn)
+                {
+                    CurrentMode = LoginMode.UnityAccount;
+                    ExternalIds = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
+                    Debug.Log("[AuthManager] Session found without handoff key (app relaunch).");
+                }
+                else if (PlayerPrefs.HasKey(PrefGuestName))
+                {
+                    GuestName   = PlayerPrefs.GetString(PrefGuestName, "Guest");
+                    CurrentMode = LoginMode.Guest;
+                    Debug.Log($"[AuthManager] Restored guest session without handoff: {GuestName}");
+                }
+                else
+                {
+                    Debug.Log("[AuthManager] No session found.");
+                }
             }
 
-            // IsReady = true BEFORE NotifyStateChanged so Scene2AuthUI's coroutine
-            // has already unblocked and re-subscribed when the event fires.
+            // Signal ready BEFORE firing so Scene2AuthUI is subscribed when event arrives
             IsReady = true;
             Debug.Log("[AuthManager] Ready.");
+            NotifyStateChanged();
+        }
+
+        // ── Auth event handlers (extracted to allow explicit invocation) ─────────
+
+        private void OnAuthSignedIn()
+        {
+            CurrentMode = LoginMode.UnityAccount;
+            ExternalIds = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
+            Debug.Log($"[AuthManager] SignedIn — PlayerID: {PlayerId}");
+            NotifyStateChanged();
+        }
+
+        private void OnAuthSignedOut()
+        {
+            Debug.Log("[AuthManager] Signed out.");
+            if (CurrentMode == LoginMode.UnityAccount) CurrentMode = LoginMode.None;
+            ExternalIds = "";
+            NotifyStateChanged();
+        }
+
+        private void OnAuthSignInFailed(RequestFailedException err)
+        {
+            Debug.LogError($"[AuthManager] Sign-in failed: {err}");
+            NotifyStateChanged();
+        }
+
+        private void OnAuthExpired()
+        {
+            Debug.LogWarning("[AuthManager] Session expired.");
+            CurrentMode = LoginMode.None;
+            ExternalIds = "";
             NotifyStateChanged();
         }
 
         // ── Public API ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Starts Unity sign-in from Scene 2 (guest upgrading to a real account).
-        /// Opens PlayerAccountService portal, then exchanges token with AuthenticationService.
+        /// Called when a guest returns from the Unity Account portal in Scene 2.
+        /// Exchanges the PlayerAccount access token for a Unity Auth session,
+        /// which also saves the session token to disk for future silent restores.
         /// </summary>
         public async Task StartUnitySignInAsync()
         {
@@ -164,15 +192,25 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
                 if (PlayerAccountService.Instance.IsSignedIn &&
                     !AuthenticationService.Instance.IsSignedIn)
-                    await FinishSignInWithTokenAsync();
+                {
+                    string token = PlayerAccountService.Instance.AccessToken;
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        await AuthenticationService.Instance.SignInWithUnityAsync(token);
+                        // Session token now saved to disk — next launch restores silently
+                        GuestName = "";
+                        PlayerPrefs.DeleteKey(PrefGuestName);
+                        PlayerPrefs.Save();
+                    }
+                }
             }
             catch (RequestFailedException ex) { Debug.LogException(ex); }
             finally { _isSigningIn = false; NotifyStateChanged(); }
         }
 
         /// <summary>
-        /// Full sign-out — clears guest state, Unity account, and all relevant PlayerPrefs.
-        /// Scene2AuthUI calls this then navigates back to Scene 1.
+        /// Explicit sign-out — clears session token from disk.
+        /// Next launch will show Scene 1 login screen.
         /// </summary>
         public void SignOut()
         {
@@ -184,30 +222,38 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             PlayerPrefs.DeleteKey(PrefLoginMode);
             PlayerPrefs.DeleteKey("PlayerSignedIn");
             PlayerPrefs.Save();
-            LogOutManager logoutManager = FindObjectOfType<LogOutManager>();
 
+            // Clear cached credentials so Scene1 cannot silently restore a prior session.
             if (AuthenticationService.Instance.IsSignedIn)
-                AuthenticationService.Instance.SignOut();
+                AuthenticationService.Instance.SignOut(true);
             if (PlayerAccountService.Instance.IsSignedIn)
                 PlayerAccountService.Instance.SignOut();
-            
-            if (logoutManager != null)
-            {
-                logoutManager.LogoutAndRestart();
-            }
 
-            Debug.Log("[AuthManager] Full sign-out.");
+            Debug.Log("[AuthManager] Signed out — session token cleared.");
             NotifyStateChanged();
         }
 
         public void OpenAccountPortal()
             => Application.OpenURL(PlayerAccountService.Instance.AccountPortalUrl);
 
+        public void SetGuestName(string guestName)
+        {
+            GuestName = guestName;
+
+            if (string.IsNullOrWhiteSpace(guestName))
+                PlayerPrefs.DeleteKey(PrefGuestName);
+            else
+                PlayerPrefs.SetString(PrefGuestName, guestName);
+
+            PlayerPrefs.Save();
+            NotifyStateChanged();
+        }
+
         // ── Internal helpers ─────────────────────────────────────────────────────
 
         private void OnPlayerAccountSignedIn()
         {
-            // Fires when the portal returns and PlayerAccountService auto-resumes
+            // Fires if PlayerAccountService resumes on its own (e.g. portal auto-return)
             if (!_isSigningIn && !AuthenticationService.Instance.IsSignedIn)
                 _ = SignInWithUnityInternalAsync();
         }
@@ -215,55 +261,14 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private async Task SignInWithUnityInternalAsync()
         {
             _isSigningIn = true;
-            try { await FinishSignInWithTokenAsync(); }
-            catch (RequestFailedException ex) { Debug.LogException(ex); }
-            finally { _isSigningIn = false; NotifyStateChanged(); }
-        }
-
-        private async Task CompleteUnitySignInAsync()
-        {
-            _isSigningIn = true;
             try
             {
-                // First try a silent session-token restore (fastest, no browser needed).
-                // Unity stores a token on-device after every successful sign-in.
-                if (AuthenticationService.Instance.SessionTokenExists)
-                {
-                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
-                    Debug.Log("[AuthManager] Session token restored silently.");
-                    // SignedIn event fires → CurrentMode set → NotifyStateChanged handled there
-                    return;
-                }
-
-                // No stored token — go through the full PlayerAccount portal flow
-                if (!PlayerAccountService.Instance.IsSignedIn)
-                    await PlayerAccountService.Instance.StartSignInAsync();
-
-                if (PlayerAccountService.Instance.IsSignedIn)
-                    await FinishSignInWithTokenAsync();
+                string token = PlayerAccountService.Instance.AccessToken;
+                if (!string.IsNullOrEmpty(token))
+                    await AuthenticationService.Instance.SignInWithUnityAsync(token);
             }
             catch (RequestFailedException ex) { Debug.LogException(ex); }
-            finally { _isSigningIn = false; }
-        }
-
-        private async Task FinishSignInWithTokenAsync()
-        {
-            if (AuthenticationService.Instance.IsSignedIn) return;
-
-            string token = PlayerAccountService.Instance.AccessToken;
-            if (string.IsNullOrEmpty(token))
-            {
-                Debug.LogWarning("[AuthManager] No access token.");
-                return;
-            }
-
-            await AuthenticationService.Instance.SignInWithUnityAsync(token);
-            Debug.Log("[AuthManager] Signed in with Unity.");
-
-            // Guest promoted to real account — clear guest name
-            GuestName = "";
-            PlayerPrefs.DeleteKey(PrefGuestName);
-            PlayerPrefs.Save();
+            finally { _isSigningIn = false; NotifyStateChanged(); }
         }
 
         private static string BuildExternalIds(PlayerInfo info)

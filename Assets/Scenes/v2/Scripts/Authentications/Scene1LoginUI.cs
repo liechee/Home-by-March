@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Unity.Services.Authentication.PlayerAccounts;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -9,19 +8,34 @@ using TMPro;
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
     /// <summary>
-    /// Scene 1 — login gate. Players reach this only on first launch or after sign-out.
+    /// Scene 1 — login gate.
     ///
-    /// Two paths:
-    ///   Guest  → player types a name → saved to PlayerPrefs → load Scene 2
-    ///   Unity  → opens PlayerAccount portal → on return writes "Unity" to PlayerPrefs → load Scene 2
+    /// On every launch this runs first and checks three things in order:
     ///
-    /// AuthManager does NOT exist here. All communication to Scene 2 is via PlayerPrefs.
+    ///   1. Does Unity Authentication have a stored session token?
+    ///      → SignInAnonymouslyAsync() with cached token — silent, no browser.
+    ///        Succeeds as long as the token hasn't expired (~30 days of inactivity).
+    ///        Player goes straight to Scene 2 without seeing this screen at all.
+    ///
+    ///   2. No valid session but a guest name is saved?
+    ///      → Restore guest mode silently, go straight to Scene 2.
+    ///
+    ///   3. Neither — brand new player or after explicit sign-out.
+    ///      → Show the login screen normally.
+    ///
+    /// When the player taps Sign In:
+    ///   → Opens Unity PlayerAccount portal (browser)
+    ///   → On return, exchanges access token for Auth session
+    ///   → Writes "Unity" to PlayerPrefs → loads Scene 2
+    ///
+    /// AuthManager does NOT exist in this scene.
+    /// All handoff to Scene 2 is via PlayerPrefs keys.
     ///
     /// Required UI:
     ///   GuestNameInput  (TMP_InputField)
     ///   PlayAsGuestBtn  (Button)
     ///   SignInBtn       (Button)
-    ///   StatusText      (TMP_Text)  — optional feedback label
+    ///   StatusText      (TMP_Text)
     /// </summary>
     public class Scene1LoginUI : MonoBehaviour
     {
@@ -38,33 +52,94 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         [SerializeField] string m_Scene2Name = "Main Screen";
 
         private bool _servicesReady = false;
-        private bool _transitioningToScene2 = false;
+        private bool _waitingForPlayerAccountReturn = false;
+        private bool _signInCompletionHandled = false;
 
         // ─────────────────────────────────────────────────────────────────────────
 
         private async void Start()
         {
+            Debug.Log("[Scene1LoginUI] Start() entered.");
+            SetButtonsInteractable(false);
             SetStatus("Loading…");
 
             m_PlayAsGuestBtn?.onClick.AddListener(OnPlayAsGuestClicked);
             m_SignInBtn?.onClick.AddListener(OnSignInClicked);
 
-            // InitializeAsync is idempotent — safe to call in both scenes
+            Debug.Log("[Scene1LoginUI] Initializing Unity Services...");
             await UnityServices.InitializeAsync();
             _servicesReady = true;
 
-            // Handles sign-in completion when the account portal resumes the app.
             PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
+            Debug.Log("[Scene1LoginUI] Unity Services ready.");
 
-            // Leave the login screen up until the player explicitly chooses a path.
-            // Scene 2 handles any state restoration after the player makes a choice.
+            // Auto-restore on launch:
+            // 1) Unity session token (signed-in users)
+            // 2) Guest handoff key (guest users)
+            if (await TryAutoResumeSessionOrGuestAsync())
+                return;
+
+            // No restorable session found: keep Scene 1 visible and wait for input.
             SetStatus("");
             SetButtonsInteractable(true);
+            Debug.Log("[Scene1LoginUI] Scene 1 UI enabled.");
+        }
+
+        private async System.Threading.Tasks.Task<bool> TryAutoResumeSessionOrGuestAsync()
+        {
+            if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+            {
+                Debug.Log("[Scene1LoginUI] Explicit logout detected. Skipping auto-resume.");
+                return false;
+            }
+
+            try
+            {
+                if (AuthenticationService.Instance.SessionTokenExists)
+                {
+                    SetStatus("Restoring session…");
+                    Debug.Log("[Scene1LoginUI] Session token found. Attempting silent sign-in...");
+
+                    // This SDK version does not expose SignInWithSessionTokenAsync().
+                    // SignInAnonymouslyAsync will restore the cached player when a
+                    // valid session token exists, without opening a browser.
+                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
+
+                    if (AuthenticationService.Instance.IsSignedIn)
+                    {
+                        PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
+                        PlayerPrefs.Save();
+                        Debug.Log("[Scene1LoginUI] Silent sign-in succeeded. Loading Scene 2...");
+                        GoToScene2();
+                        return true;
+                    }
+                }
+            }
+            catch (RequestFailedException ex)
+            {
+                // Token may be expired or invalid; continue with guest/manual login.
+                Debug.LogWarning($"[Scene1LoginUI] Silent sign-in failed: {ex.Message}");
+            }
+
+            if (PlayerPrefs.HasKey(AuthManager.PrefGuestName))
+            {
+                string guestName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+                if (!string.IsNullOrEmpty(guestName))
+                {
+                    PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
+                    PlayerPrefs.Save();
+                    Debug.Log($"[Scene1LoginUI] Restored guest '{guestName}'. Loading Scene 2...");
+                    GoToScene2();
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void OnDestroy()
         {
-            if (_servicesReady)
+            if (PlayerAccountService.Instance != null)
                 PlayerAccountService.Instance.SignedIn -= OnPlayerAccountSignedIn;
         }
 
@@ -72,68 +147,115 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         private void OnPlayAsGuestClicked()
         {
+            Debug.Log("[Scene1LoginUI] Play As Guest clicked.");
             string name = m_GuestNameInput != null ? m_GuestNameInput.text.Trim() : "";
             if (string.IsNullOrEmpty(name))
             {
                 SetStatus("Please enter a name to continue.");
+                Debug.LogWarning("[Scene1LoginUI] Guest name is empty.");
                 return;
             }
-
             PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
             PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
+            PlayerPrefs.DeleteKey("HasLoggedOut");
             PlayerPrefs.Save();
+            Debug.Log($"[Scene1LoginUI] Guest login saved for '{name}'. Loading Scene 2...");
             GoToScene2();
         }
 
         private async void OnSignInClicked()
         {
+            Debug.Log("[Scene1LoginUI] Sign In clicked.");
             if (!_servicesReady) return;
 
             SetStatus("Opening sign-in…");
             SetButtonsInteractable(false);
+            _waitingForPlayerAccountReturn = true;
+            _signInCompletionHandled = false;
 
             try
             {
+                // Step 1: open the Unity PlayerAccount portal (browser)
+                Debug.Log("[Scene1LoginUI] Checking PlayerAccount sign-in state...");
                 if (!PlayerAccountService.Instance.IsSignedIn)
+                {
+                    Debug.Log("[Scene1LoginUI] Starting PlayerAccount sign-in...");
                     await PlayerAccountService.Instance.StartSignInAsync();
+                }
 
                 if (PlayerAccountService.Instance.IsSignedIn)
                 {
-                    ContinueToScene2WithUnityMode();
+                    Debug.Log("[Scene1LoginUI] PlayerAccount already signed in after StartSignInAsync.");
+                    await CompleteUnitySignInAndLoadSceneAsync();
+                    return;
                 }
-                else
-                {
-                    SetStatus("Sign-in was cancelled. Try again.");
-                    SetButtonsInteractable(true);
-                }
+
+                SetStatus("Complete sign-in in the browser, then return here.");
+                Debug.Log("[Scene1LoginUI] Waiting for PlayerAccountService.SignedIn event.");
             }
             catch (RequestFailedException ex)
             {
                 Debug.LogException(ex);
                 SetStatus("Sign-in failed. Try again.");
+                Debug.LogError("[Scene1LoginUI] Sign-in failed.");
+                _waitingForPlayerAccountReturn = false;
                 SetButtonsInteractable(true);
             }
         }
 
-        private void OnPlayerAccountSignedIn()
+        private async void OnPlayerAccountSignedIn()
         {
-            ContinueToScene2WithUnityMode();
+            if (!_waitingForPlayerAccountReturn || _signInCompletionHandled)
+                return;
+
+            await CompleteUnitySignInAndLoadSceneAsync();
         }
 
-        private void ContinueToScene2WithUnityMode()
+        private async System.Threading.Tasks.Task CompleteUnitySignInAndLoadSceneAsync()
         {
-            if (_transitioningToScene2) return;
-            _transitioningToScene2 = true;
+            if (_signInCompletionHandled)
+                return;
 
-            PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
-            PlayerPrefs.Save();
-            GoToScene2();
+            _signInCompletionHandled = true;
+
+            try
+            {
+                string token = PlayerAccountService.Instance.AccessToken;
+                if (string.IsNullOrEmpty(token))
+                {
+                    Debug.LogWarning("[Scene1LoginUI] PlayerAccount access token is empty.");
+                    SetStatus("Sign-in failed. Try again.");
+                    _waitingForPlayerAccountReturn = false;
+                    SetButtonsInteractable(true);
+                    return;
+                }
+
+                Debug.Log("[Scene1LoginUI] PlayerAccount sign-in complete. Exchanging token for Unity Auth session...");
+                await AuthenticationService.Instance.SignInWithUnityAsync(token);
+
+                Debug.Log("[Scene1] Sign-in complete.");
+                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
+                PlayerPrefs.DeleteKey("HasLoggedOut");
+                PlayerPrefs.Save();
+                _waitingForPlayerAccountReturn = false;
+                Debug.Log("[Scene1LoginUI] Saved Unity login mode. Loading Scene 2...");
+                GoToScene2();
+            }
+            catch (RequestFailedException ex)
+            {
+                Debug.LogException(ex);
+                SetStatus("Sign-in failed. Try again.");
+                Debug.LogError("[Scene1LoginUI] Sign-in failed.");
+                _waitingForPlayerAccountReturn = false;
+                SetButtonsInteractable(true);
+            }
         }
 
         // ── Navigation ────────────────────────────────────────────────────────────
 
         private void GoToScene2()
         {
+            Debug.Log($"[Scene1LoginUI] Loading scene '{m_Scene2Name}'.");
             if (m_SceneChanger != null)
                 m_SceneChanger.ChangeScene(m_Scene2Name);
             else

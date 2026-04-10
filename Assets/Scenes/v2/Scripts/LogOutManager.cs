@@ -33,9 +33,8 @@ public class LogOutManager : MonoBehaviour
 
         if (AuthenticationService.Instance.IsSignedIn)
         {
-            Debug.Log("[LOGOUT] Deleting cloud data...");
-            await DeleteAllCloudSaveData();
-            AuthenticationService.Instance.SignOut();
+            Debug.Log("[LOGOUT] Preserving cloud data; clearing local/session state only.");
+            AuthenticationService.Instance.SignOut(true);
             Debug.Log("[LOGOUT] Signed out.");
         }
 
@@ -138,23 +137,9 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
-    [Obsolete]
     private async Task DeleteAllCloudSaveData()
     {
-        try
-        {
-            var keys = await CloudSaveService.Instance.Data.RetrieveAllKeysAsync();
-            foreach (var key in keys)
-            {
-                await CloudSaveService.Instance.Data.ForceDeleteAsync(key);
-                Debug.Log($"[LOGOUT] Cloud key deleted: {key}");
-            }
-            Debug.Log(keys.Count > 0 ? "[LOGOUT] All cloud data deleted." : "[LOGOUT] No cloud data found.");
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[LOGOUT] Error deleting cloud data: {e.Message}");
-        }
+        await Task.CompletedTask;
     }
     private IEnumerator ReloadEntryScreen(float delay)
     {

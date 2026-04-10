@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 [System.Serializable]
 public class PlayerData : MonoBehaviour
 {
+    public static event Action onPlayerDataChanged;
+
     public string playerName;
     public int level;
     public float health;
@@ -40,7 +42,7 @@ public class PlayerData : MonoBehaviour
 
     public PlayerData()
     {
-        playerName = "New Player";
+        playerName = "";
         level = 1;
         health = 100;
         attack = 10;
@@ -106,6 +108,7 @@ public class PlayerData : MonoBehaviour
     public void ChangePlayerName(string name)
     {
         playerName = name;
+        NotifyDataChanged();
         SavePlayerDataAndSyncCloud();
         Debug.Log($"[PlayerData] Name changed to '{playerName}'.");
     }
@@ -163,6 +166,7 @@ public class PlayerData : MonoBehaviour
         if (isLoggingOut) return;
         if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (!AuthenticationService.Instance.IsSignedIn) return;
+        if (PlayerPrefs.GetInt("PlayerSignedIn", 0) != 1) return;
 
         PlayerDataSaver snapshot = BuildSaveData();
         await CloudSaver.SaveDataToCloud("playerData", snapshot);
@@ -245,7 +249,13 @@ public class PlayerData : MonoBehaviour
         attackSpeed = d.attackSpeed;
 
         UpdateCurrentStats();
+        NotifyDataChanged();
     }
 
     public void SetPlayerStats(PlayerDataSaver d) => ApplySaveData(d);
+
+    private void NotifyDataChanged()
+    {
+        onPlayerDataChanged?.Invoke();
+    }
 }

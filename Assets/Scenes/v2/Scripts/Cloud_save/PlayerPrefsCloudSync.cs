@@ -96,6 +96,12 @@ public static class PlayerPrefsCloudSync
             }
         }
 
+        if (data.keys.Count == 0)
+        {
+            Debug.LogWarning("[PlayerPrefsCloudSync] SaveAllToCloud skipped — payload is empty (no tracked PlayerPrefs keys).");
+            return;
+        }
+
         string json = JsonUtility.ToJson(data);
         var cloudData = new Dictionary<string, object> { { CloudKey, json } };
 

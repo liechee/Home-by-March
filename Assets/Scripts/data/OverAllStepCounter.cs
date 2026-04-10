@@ -68,15 +68,19 @@ public class OverallStepCounter : MonoBehaviour
 
     private const string OverallOffsetKey = "OverallStepOffset";
     private const string DailyOffsetKey = "DailyStepOffset";
+    private bool backgroundCollectionInitialized = false;
 
     void Awake()
     {
         stepDataJsonFilePath = Application.persistentDataPath + "/stepData.json";
+        // Force the first SaveStepData call this launch to write immediately.
+        lastDiskSaveTime = Time.realtimeSinceStartup - Mathf.Max(0.1f, diskSaveInterval);
 
         if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
         DontDestroyOnLoad(gameObject);
 
+        EnsureBackgroundStepCollection();
         CaptureAppOpenSteps();
 
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
@@ -93,6 +97,28 @@ public class OverallStepCounter : MonoBehaviour
             waitingForCloudData = true;
 
         LoadStepData();
+    }
+
+    private void EnsureBackgroundStepCollection()
+    {
+        if (backgroundCollectionInitialized) return;
+        if (PlayerPrefs.GetInt("SuppressStepQuery", 0) == 1) return;
+
+        backgroundCollectionInitialized = true;
+
+        new StepCounterRequest()
+            .OnPermissionGranted(() =>
+            {
+                // Enable native background collection once so steps can accumulate while app is closed.
+                new StepCounterRequest().Enable();
+                if (debugStepQueries)
+                    Debug.Log("[StepCounter] Background step collection enabled.");
+            })
+            .OnPermissionDenied(() =>
+            {
+                Debug.LogWarning("[StepCounter] Activity recognition permission denied. Closed-app step accumulation may be unavailable.");
+            })
+            .RequestPermission();
     }
 
     void Start()
@@ -657,7 +683,12 @@ public class OverallStepCounter : MonoBehaviour
         stepData = JsonUtility.FromJson<StepData>(File.ReadAllText(stepDataJsonFilePath)) ?? new StepData();
 
         overallSteps = stepData.overallSteps != 0 ? stepData.overallSteps : stepData.numberOfSteps;
-        overallStepsBeforeToday = stepData.numberOfSteps;
+        //overallStepsBeforeToday = stepData.numberOfSteps;
+        bool isSameDay = !string.IsNullOrEmpty(stepData.lastSaveTime) &&
+                 DateTime.Parse(stepData.lastSaveTime).Date == DateTime.Today;
+        overallStepsBeforeToday = isSameDay
+            ? Math.Max(0, overallSteps - stepData.dailySteps)
+            : stepData.numberOfSteps;
 
         bool isNewDay = !string.IsNullOrEmpty(stepData.lastSaveTime) &&
                         DateTime.Parse(stepData.lastSaveTime).Date < DateTime.Today;
@@ -695,6 +726,9 @@ public class OverallStepCounter : MonoBehaviour
         overallStepsBeforeToday = 0;
         savedDailyBase = 0;
         stepData.baselineSteps = 0;
+
+        // Persist a baseline file right away so abrupt app closes do not lose initialization state.
+        WriteToDisk();
 
         onStepsUpdated?.Invoke(0, 0);
 

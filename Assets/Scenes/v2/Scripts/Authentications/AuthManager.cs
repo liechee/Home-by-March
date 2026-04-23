@@ -124,6 +124,26 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                     ExternalIds = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
                     Debug.Log("[AuthManager] Session found without handoff key (app relaunch).");
                 }
+                else if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 0 &&
+                         AuthenticationService.Instance.SessionTokenExists)
+                {
+                    try
+                    {
+                        Debug.Log("[AuthManager] Session token found without handoff; attempting silent restore...");
+                        await AuthenticationService.Instance.SignInAnonymouslyAsync();
+
+                        if (AuthenticationService.Instance.IsSignedIn)
+                        {
+                            CurrentMode = LoginMode.UnityAccount;
+                            ExternalIds = BuildExternalIds(AuthenticationService.Instance.PlayerInfo);
+                            Debug.Log("[AuthManager] Silent restore succeeded in Scene 2.");
+                        }
+                    }
+                    catch (RequestFailedException ex)
+                    {
+                        Debug.LogWarning($"[AuthManager] Silent restore failed in Scene 2: {ex.Message}");
+                    }
+                }
                 else if (PlayerPrefs.HasKey(PrefGuestName))
                 {
                     GuestName   = PlayerPrefs.GetString(PrefGuestName, "Guest");

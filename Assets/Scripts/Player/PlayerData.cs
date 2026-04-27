@@ -62,10 +62,10 @@ public class PlayerData : MonoBehaviour
         if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
         {
             string savedName = playerName;
-            bool isNew = string.IsNullOrEmpty(savedName) || savedName == "New Player";
+            bool isNew = string.IsNullOrEmpty(savedName) || savedName == "";
 
             Reset();
-            playerName = isNew ? "New Player" : savedName;
+            playerName = isNew ? "" : savedName;
 
             SavePlayerData();
             UpdateCurrentStats();

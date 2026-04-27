@@ -13,6 +13,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         [Header("UI References")]
         [SerializeField] TMP_InputField m_GuestNameInput;
+        [SerializeField] NameChangePanel m_NameChangePanel;
         [SerializeField] Button         m_PlayAsGuestBtn;
         [SerializeField] Button         m_SignInBtn;
         [SerializeField] TMP_Text       m_StatusText;
@@ -121,18 +122,35 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private void OnPlayAsGuestClicked()
         {
             Debug.Log("[Scene1LoginUI] Play As Guest clicked.");
-            string name = m_GuestNameInput != null ? m_GuestNameInput.text.Trim() : "";
-            if (string.IsNullOrEmpty(name))
+
+            if (m_NameChangePanel != null)
             {
-                SetStatus("Please enter a name to continue.");
-                Debug.LogWarning("[Scene1LoginUI] Guest name is empty.");
-                return;
+                if (!m_NameChangePanel.TryPrepareGuestFromInput(m_GuestNameInput, out string validationMessage))
+                {
+                    SetStatus(validationMessage);
+                    Debug.LogWarning($"[Scene1LoginUI] Guest flow blocked: {validationMessage}");
+                    return;
+                }
             }
-            PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
-            PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
-            PlayerPrefs.DeleteKey("HasLoggedOut");
-            PlayerPrefs.Save();
-            Debug.Log($"[Scene1LoginUI] Guest login saved for '{name}'. Loading Scene 2...");
+            else
+            {
+                // Fallback if NameChangePanel is not wired yet.
+                string name = m_GuestNameInput != null ? m_GuestNameInput.text.Trim() : "";
+                if (string.IsNullOrEmpty(name))
+                {
+                    SetStatus("Please enter a name to continue.");
+                    Debug.LogWarning("[Scene1LoginUI] Guest name is empty.");
+                    return;
+                }
+
+                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
+                PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
+                PlayerPrefs.DeleteKey("HasLoggedOut");
+                PlayerPrefs.Save();
+            }
+
+            string preparedName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+            Debug.Log($"[Scene1LoginUI] Guest login saved for '{preparedName}'. Loading Scene 2...");
             GoToScene2();
         }
 

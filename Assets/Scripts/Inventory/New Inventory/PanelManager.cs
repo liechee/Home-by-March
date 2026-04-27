@@ -7,6 +7,9 @@ public class PanelManager : MonoBehaviour
 {
     public Player player;
     public float loadDelay = 0.5f; // Delay in seconds
+    [Header("Cloud Keys")]
+    public string inventoryCloudKey = "PlayerInventory";
+    public string equipmentCloudKey = "PlayerEquip";
 
     public void OnEnable()
     {
@@ -38,14 +41,14 @@ public class PanelManager : MonoBehaviour
     }
 
     public async Task SaveInventoryToCloud(){
-        await player.inventory.SaveInventoryToCloud("inventory");
-        await player.equipment.SaveInventoryToCloud("equipment");
+        await player.inventory.SaveInventoryToCloud(inventoryCloudKey);
+        await player.equipment.SaveInventoryToCloud(equipmentCloudKey);
         Debug.Log("Player data saved to cloud.");
     }
 
     public async Task LoadInventoryFromCloud(){
-        await player.inventory.LoadInventoryFromCloud("inventory");
-        await player.equipment.LoadInventoryFromCloud("equipment");
+        await player.inventory.LoadInventoryFromCloud(inventoryCloudKey);
+        await player.equipment.LoadInventoryFromCloud(equipmentCloudKey);
         Debug.Log("Player data loaded from cloud.");
     }
 }

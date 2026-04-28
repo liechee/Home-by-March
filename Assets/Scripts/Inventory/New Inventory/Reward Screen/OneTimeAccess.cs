@@ -4,9 +4,15 @@ public class OneTimePanelAccess : MonoBehaviour
 {
     public GameObject panel;
     public string itemClaimedKey = "ItemClaimed";
+    private const string Scene1SignedInKey = "SignedInFromScene1Auth";
 
     void Start()
     {
+        if (ShouldSkipForScene1SignIn())
+        {
+            gameObject.SetActive(false);
+            return;
+        }
 
         // If already claimed, disable this object so it can't trigger again
         if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 1)
@@ -17,6 +23,9 @@ public class OneTimePanelAccess : MonoBehaviour
 
     public void ShowPanel()
     {
+        if (ShouldSkipForScene1SignIn())
+            return;
+
         if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 0)
         {
             panel.SetActive(true);
@@ -46,5 +55,15 @@ public class OneTimePanelAccess : MonoBehaviour
         gameObject.SetActive(false);
 
         Debug.Log("Item claimed and panel closed.");
+    }
+
+    private bool ShouldSkipForScene1SignIn()
+    {
+        if (PlayerPrefs.GetInt(Scene1SignedInKey, 0) != 1)
+            return false;
+
+        PlayerPrefs.DeleteKey(Scene1SignedInKey);
+        PlayerPrefs.Save();
+        return true;
     }
 }

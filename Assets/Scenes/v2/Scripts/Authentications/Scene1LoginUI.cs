@@ -7,40 +7,13 @@ using TMPro;
 
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
-    /// <summary>
-    /// Scene 1 — login gate.
-    ///
-    /// On every launch this runs first and checks three things in order:
-    ///
-    ///   1. Does Unity Authentication have a stored session token?
-    ///      → SignInAnonymouslyAsync() with cached token — silent, no browser.
-    ///        Succeeds as long as the token hasn't expired (~30 days of inactivity).
-    ///        Player goes straight to Scene 2 without seeing this screen at all.
-    ///
-    ///   2. No valid session but a guest name is saved?
-    ///      → Restore guest mode silently, go straight to Scene 2.
-    ///
-    ///   3. Neither — brand new player or after explicit sign-out.
-    ///      → Show the login screen normally.
-    ///
-    /// When the player taps Sign In:
-    ///   → Opens Unity PlayerAccount portal (browser)
-    ///   → On return, exchanges access token for Auth session
-    ///   → Writes "Unity" to PlayerPrefs → loads Scene 2
-    ///
-    /// AuthManager does NOT exist in this scene.
-    /// All handoff to Scene 2 is via PlayerPrefs keys.
-    ///
-    /// Required UI:
-    ///   GuestNameInput  (TMP_InputField)
-    ///   PlayAsGuestBtn  (Button)
-    ///   SignInBtn       (Button)
-    ///   StatusText      (TMP_Text)
-    /// </summary>
     public class Scene1LoginUI : MonoBehaviour
     {
+        private const string Scene1SignedInKey = "SignedInFromScene1Auth";
+
         [Header("UI References")]
         [SerializeField] TMP_InputField m_GuestNameInput;
+        [SerializeField] NameChangePanel m_NameChangePanel;
         [SerializeField] Button         m_PlayAsGuestBtn;
         [SerializeField] Button         m_SignInBtn;
         [SerializeField] TMP_Text       m_StatusText;
@@ -108,6 +81,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                     if (AuthenticationService.Instance.IsSignedIn)
                     {
                         PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
+                        PlayerPrefs.SetInt(Scene1SignedInKey, 1);
                         PlayerPrefs.Save();
                         Debug.Log("[Scene1LoginUI] Silent sign-in succeeded. Loading Scene 2...");
                         GoToScene2();
@@ -148,18 +122,35 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private void OnPlayAsGuestClicked()
         {
             Debug.Log("[Scene1LoginUI] Play As Guest clicked.");
-            string name = m_GuestNameInput != null ? m_GuestNameInput.text.Trim() : "";
-            if (string.IsNullOrEmpty(name))
+
+            if (m_NameChangePanel != null)
             {
-                SetStatus("Please enter a name to continue.");
-                Debug.LogWarning("[Scene1LoginUI] Guest name is empty.");
-                return;
+                if (!m_NameChangePanel.TryPrepareGuestFromInput(m_GuestNameInput, out string validationMessage))
+                {
+                    SetStatus(validationMessage);
+                    Debug.LogWarning($"[Scene1LoginUI] Guest flow blocked: {validationMessage}");
+                    return;
+                }
             }
-            PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
-            PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
-            PlayerPrefs.DeleteKey("HasLoggedOut");
-            PlayerPrefs.Save();
-            Debug.Log($"[Scene1LoginUI] Guest login saved for '{name}'. Loading Scene 2...");
+            else
+            {
+                // Fallback if NameChangePanel is not wired yet.
+                string name = m_GuestNameInput != null ? m_GuestNameInput.text.Trim() : "";
+                if (string.IsNullOrEmpty(name))
+                {
+                    SetStatus("Please enter a name to continue.");
+                    Debug.LogWarning("[Scene1LoginUI] Guest name is empty.");
+                    return;
+                }
+
+                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
+                PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
+                PlayerPrefs.DeleteKey("HasLoggedOut");
+                PlayerPrefs.Save();
+            }
+
+            string preparedName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+            Debug.Log($"[Scene1LoginUI] Guest login saved for '{preparedName}'. Loading Scene 2...");
             GoToScene2();
         }
 
@@ -235,6 +226,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
                 Debug.Log("[Scene1] Sign-in complete.");
                 PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
+                PlayerPrefs.SetInt(Scene1SignedInKey, 1);
                 PlayerPrefs.DeleteKey("HasLoggedOut");
                 PlayerPrefs.Save();
                 _waitingForPlayerAccountReturn = false;

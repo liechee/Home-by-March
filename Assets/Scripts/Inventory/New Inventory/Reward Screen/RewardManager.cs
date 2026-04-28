@@ -4,9 +4,16 @@ public class RewardManager : MonoBehaviour
 {
     public GameObject rewardPanel; // The reward panel to show or hide
     private const string RewardClaimedKey = "RewardClaimed"; // Key for PlayerPrefs to store the claim status
+    private const string Scene1SignedInKey = "SignedInFromScene1Auth";
 
     void Start()
     {
+        if (ShouldSkipForScene1SignIn())
+        {
+            if (rewardPanel != null) rewardPanel.SetActive(false);
+            return;
+        }
+
         // Check if the reward has already been claimed
         if (PlayerPrefs.GetInt(RewardClaimedKey, 0) == 1)
         {
@@ -29,5 +36,15 @@ public class RewardManager : MonoBehaviour
 
         // Set the reward panel inactive after claiming
         rewardPanel.SetActive(false);
+    }
+
+    private bool ShouldSkipForScene1SignIn()
+    {
+        if (PlayerPrefs.GetInt(Scene1SignedInKey, 0) != 1)
+            return false;
+
+        PlayerPrefs.DeleteKey(Scene1SignedInKey);
+        PlayerPrefs.Save();
+        return true;
     }
 }

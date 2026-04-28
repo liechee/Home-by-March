@@ -51,7 +51,15 @@ public class Player : MonoBehaviour
             equipment.GetSlots[i].OnAfterUpdate += OnAddItem;
         }
 
+        // Restore persisted data on startup so inventory/equipment survive app relaunch.
+        if (inventory != null)
+            inventory.Load();
+
+        if (equipment != null)
+            equipment.Load();
+
         UpdatePlayerDataAttributes();
+        playerData.UpdateCurrentStats();
     }
 
     private void UpdatePlayerDataAttributes()
@@ -87,7 +95,7 @@ public class Player : MonoBehaviour
     {
         if (_slot.ItemObject == null) return;
 
-        switch (_slot.parent.inventory.type)
+        switch (equipment.type)
         {
             case InterfaceType.Equipment:
                 // Add buffs
@@ -124,13 +132,14 @@ public class Player : MonoBehaviour
 
         UpdatePlayerDataAttributes();
         playerData.UpdateCurrentStats();
+        PersistInventoryState();
     }
 
     public void OnRemoveItem(InventorySlot _slot)
     {
         if (_slot.ItemObject == null) return;
 
-        switch (_slot.parent.inventory.type)
+        switch (equipment.type)
         {
             case InterfaceType.Equipment:
                 // Remove buffs
@@ -161,6 +170,7 @@ public class Player : MonoBehaviour
 
         UpdatePlayerDataAttributes();
         playerData.UpdateCurrentStats();
+        PersistInventoryState();
     }
 
     private void OnEnable()
@@ -269,10 +279,30 @@ public class Player : MonoBehaviour
         Debug.Log(string.Concat(attribute.type, " was updated! Value is now ", attribute.value.ModifiedValue));
     }
 
+    private void PersistInventoryState()
+    {
+        if (inventory != null)
+            inventory.Save();
+
+        if (equipment != null)
+            equipment.Save();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            PersistInventoryState();
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus)
+            PersistInventoryState();
+    }
+
     private void OnApplicationQuit()
     {
-        inventory.Clear();
-        equipment.Clear();
+        PersistInventoryState();
     }
 }
 

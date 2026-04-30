@@ -6,33 +6,6 @@ using TMPro;
 
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
-    /// <summary>
-    /// Scene 2 auth UI — mirrors the PlayerAccountsDemo pattern.
-    ///
-    /// Works in two modes depending on how the player arrived:
-    ///
-    ///   GUEST MODE  (CurrentMode == Guest)
-    ///     • Shows guest name in status text
-    ///     • Shows  [Sign In]  button — opens Unity Account portal so they can save progress
-    ///     • Shows  [Sign Out] button — returns to Scene 1
-    ///     • After successful portal sign-in, promotes to SIGNED-IN MODE automatically
-    ///
-    ///   SIGNED-IN MODE  (CurrentMode == UnityAccount)
-    ///     • Shows player ID + external IDs in status text
-    ///     • Hides  [Sign In]  button
-    ///     • Shows  [Sign Out] button
-    ///     • Triggers cloud data loads (steps, prefs, player data)
-    ///
-    /// This script also calls PlayerAccountsDemo.SetExternalUiTargets() if that
-    /// component is present in the scene, so both UIs stay in sync exactly like
-    /// the original PlayerAccountsDemo dual-UI pattern.
-    ///
-    /// Required UI (all must be active in hierarchy by default — script controls visibility):
-    ///   m_StatusText      TMP_Text    — shows current auth state
-    ///   m_SignOutBtn      GameObject  — visible in both guest and signed-in modes
-    ///   m_SignInBtn       GameObject  — visible in guest mode only; hidden once signed in
-    ///   m_WaitingText     TMP_Text    — shown while waiting for portal to return (optional)
-    /// </summary>
     public class Scene2AuthUI : MonoBehaviour
     {
         [Header("Status UI")]

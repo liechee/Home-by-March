@@ -9,14 +9,14 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
     public class Scene2AuthUI : MonoBehaviour
     {
         [Header("Status UI")]
-        [SerializeField] TMP_Text   m_StatusText;
-
+        [SerializeField] TMP_Text m_StatusText;
+        [SerializeField] TMP_Text m_profileStatusText;
         [Header("Buttons (must be active in hierarchy by default)")]
         [SerializeField] GameObject m_SignOutBtn;   // visible for both guest and signed-in
         [SerializeField] GameObject m_SignInBtn;    // visible for guest only
 
         [Header("Optional")]
-        [SerializeField] TMP_Text   m_WaitingText;  // "Waiting for sign-in…" shown during portal
+        [SerializeField] TMP_Text m_WaitingText;  // "Waiting for sign-in…" shown during portal
 
         [Header("Scene Changer")]
         [Tooltip("Drag the GameObject that has SceneChanger on it here.")]
@@ -25,9 +25,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         [SerializeField] string m_Scene1Name = "Scene1";
 
         [Header("Optional: cloud-load systems")]
-        [SerializeField] OverallStepCounter         m_StepCounter;
+        [SerializeField] OverallStepCounter m_StepCounter;
         [SerializeField] PlayerPrefsCloudSyncButton m_SyncButton;
-        [SerializeField] PlayerData                 m_PlayerData;
+        [SerializeField] PlayerData m_PlayerData;
 
         private bool _waitingForPortalReturn = false;
         private bool _cloudLoadTriggeredForSignedInSession = false;
@@ -75,7 +75,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             // so both UIs mirror each other (matches SetExternalUiTargets pattern)
             var demo = FindObjectOfType<PlayerAccountsDemo>();
             if (demo != null)
-                demo.SetExternalUiTargets(m_StatusText, m_SignOutBtn, m_SignInBtn);
+                demo.SetExternalUiTargets(m_StatusText, m_profileStatusText, m_SignOutBtn, m_SignInBtn);
 
             // Wait for AuthManager.IsReady before drawing — avoids the race condition
             // where RefreshUI() reads state before InitAsync() has finished
@@ -143,7 +143,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         {
             if (AuthManager.Instance == null) return;
 
-            bool isGuest    = AuthManager.Instance.IsGuest;
+            bool isGuest = AuthManager.Instance.IsGuest;
             bool isSignedIn = AuthManager.Instance.IsSignedIn;
             bool hasSession = isGuest || isSignedIn;
 
@@ -157,7 +157,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
                 if (isSignedIn)
                 {
-                    sb.AppendLine("Signed in");
+                    sb.AppendLine("Bound to the world. Your journey is safe.");
                     sb.AppendLine($"ExternalIds: <b>{AuthManager.Instance.ExternalIds}</b>");
                 }
                 else if (isGuest)
@@ -167,10 +167,29 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 }
                 else
                 {
-                    sb.AppendLine("Not signed in");
+                    sb.AppendLine("Your journey is not yet bound. Sign in to preserve your path");
                 }
 
                 m_StatusText.text = sb.ToString();
+            }
+            if (m_profileStatusText != null)
+            {
+                var stat = new StringBuilder();
+                const string colorOpen = "<color=#FFEE00>";
+                const string colorClose = "</color>";
+                if (isSignedIn)
+                {
+                    stat.AppendLine($"{colorOpen}Your journey is safe.{colorClose}");
+                }
+                else if (isGuest)
+                {
+                    stat.AppendLine($"{colorOpen}Log in to save your journey.{colorClose}");
+                }
+                else
+                {
+                    stat.AppendLine($"{colorOpen}Log in to save your journey.{colorClose}");
+                }
+                m_profileStatusText.text = stat.ToString();
             }
 
             // ── Button visibility — mirrors PlayerAccountsDemo.ApplyUiState() ─────

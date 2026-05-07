@@ -7,31 +7,10 @@ using UnityEngine;
 
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
-    /// <summary>
-    /// Placed in Scene 2 only. No DontDestroyOnLoad.
-    ///
-    /// On Scene 2 load, reads the PlayerPrefs handoff from Scene1LoginUI:
-    ///   "PendingLoginMode" = "Guest"  → restore guest name, no network call
-    ///   "PendingLoginMode" = "Unity"  → AuthenticationService is already signed in
-    ///                                    (Scene1LoginUI completed sign-in before loading)
-    ///
-    /// For session persistence across app restarts:
-    ///   Unity Authentication automatically saves a session token to the device.
-    ///   Scene1LoginUI restores via SignInAnonymouslyAsync() when a cached token exists.
-    ///   By the time Scene 2 loads, AuthenticationService.IsSignedIn is already true.
-    ///   AuthManager just reads that state — no extra sign-in calls needed here.
-    ///
-    /// Guest → Unity account upgrade (from Scene 2):
-    ///   Guest taps Sign In → opens PlayerAccount portal → app regains focus
-    ///   → StartUnitySignInAsync() exchanges the new access token with AuthenticationService
-    ///   → session token is written to disk → next relaunch restores silently
-    /// </summary>
     public class AuthManager : MonoBehaviour
     {
-        // ── Singleton ────────────────────────────────────────────────────────────
         public static AuthManager Instance { get; private set; }
 
-        // ── State ────────────────────────────────────────────────────────────────
         public enum LoginMode { None, Guest, UnityAccount }
 
         public LoginMode CurrentMode { get; private set; } = LoginMode.None;
@@ -48,17 +27,14 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         public string PlayerId    => AuthenticationService.Instance.IsSignedIn
                                      ? AuthenticationService.Instance.PlayerId : "";
 
-        // ── Events ───────────────────────────────────────────────────────────────
         public event Action OnStateChanged;
 
-        // ── Internal ─────────────────────────────────────────────────────────────
         private bool _isSigningIn   = false;
         private bool _servicesReady = false;
 
         public const string PrefLoginMode = "PendingLoginMode";
         public const string PrefGuestName = "GuestName";
 
-        // ─────────────────────────────────────────────────────────────────────────
 
         private void Awake()
         {
@@ -77,14 +53,12 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             await UnityServices.InitializeAsync();
             _servicesReady = true;
 
-            // ── Unity Auth events ─────────────────────────────────────────────────
             AuthenticationService.Instance.SignedIn += OnAuthSignedIn;
             AuthenticationService.Instance.SignedOut += OnAuthSignedOut;
             AuthenticationService.Instance.SignInFailed += OnAuthSignInFailed;
             AuthenticationService.Instance.Expired += OnAuthExpired;
             PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
 
-            // ── Read Scene 1's handoff ────────────────────────────────────────────
             string pendingMode = PlayerPrefs.GetString(PrefLoginMode, "");
 
             if (pendingMode == "Guest")
@@ -227,11 +201,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             catch (RequestFailedException ex) { Debug.LogException(ex); }
             finally { _isSigningIn = false; NotifyStateChanged(); }
         }
-
-        /// <summary>
-        /// Explicit sign-out — clears session token from disk.
-        /// Next launch will show Scene 1 login screen.
-        /// </summary>
         public void SignOut()
         {
             GuestName   = "";
@@ -268,8 +237,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             PlayerPrefs.Save();
             NotifyStateChanged();
         }
-
-        // ── Internal helpers ─────────────────────────────────────────────────────
 
         private void OnPlayerAccountSignedIn()
         {

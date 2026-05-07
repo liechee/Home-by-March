@@ -145,6 +145,6 @@ public class LogOutManager : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         Debug.Log("[LOGOUT] ── Loading Entry Screen ──────────────────────────────");
-        SceneManager.LoadScene("Entry Screen");
+        SceneManager.LoadScene("LogIn Screen 2");
     }
 }

@@ -13,11 +13,23 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         [SerializeField] GameObject m_SignIn;
 
         private TMP_Text m_ExternalStatusText;
+        private TMP_Text m_ExternalProfileStatusText;
         private GameObject m_ExternalSignOut;
         private GameObject m_ExternalSignIn;
 
         private bool _isSigningIn = false;
         private string m_ExternalIds = "";
+        private bool _lastSignedInState = false;
+
+        private void Update()
+        {
+            bool currentSignedInState = AuthenticationService.Instance.IsSignedIn;
+            if (currentSignedInState != _lastSignedInState)
+            {
+                _lastSignedInState = currentSignedInState;
+                UpdateUI();
+            }
+        }
         private async void Awake()
         {
             await UnityServices.InitializeAsync();
@@ -35,6 +47,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             UpdateUI();
         }
+        
+
         public async void StartSignInAsync()
         {
             if (_isSigningIn) return;
@@ -117,20 +131,21 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             Application.OpenURL(PlayerAccountService.Instance.AccountPortalUrl);
         }
 
-        public void SetExternalUiTargets(TMP_Text statusText, GameObject signOutButton, GameObject signInButton)
+        public void SetExternalUiTargets(TMP_Text statusText, TMP_Text profileStatusText, GameObject signOutButton, GameObject signInButton)
         {
             m_ExternalStatusText = statusText;
+            m_ExternalProfileStatusText = profileStatusText;
             m_ExternalSignOut = signOutButton;
             m_ExternalSignIn = signInButton;
             UpdateUI();
         }
 
-   
+
         private void OnFullySignedIn()
         {
             Debug.Log("[Auth] Player fully signed in — notifying systems.");
 
-            
+
             PlayerPrefs.SetInt("PlayerSignedIn", 1);
             PlayerPrefs.Save();
 
@@ -196,12 +211,23 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             Debug.Log($"[Auth] UpdateUI — IsSignedIn: {signedIn}");
 
             var sb = new StringBuilder();
-            sb.AppendLine(signedIn ? "Signed in" : "Not signed in");
-            if (signedIn) sb.AppendLine(GetPlayerInfoText());
+            var sb2 = new StringBuilder();
+            const string colorOpen = "<color=#FFEE00>";
+            const string colorClose = "</color>";
+            sb.AppendLine(signedIn ? "Your journey is bound. Save your progress and carry every step with you — continue your march home from any device, anywhere." : "Your progress is not yet safe. Log in to save your journey to the clouds and carry every step with you — continue your march home on any device, anywhere.");
+
+            if (signedIn)
+            {
+                sb2.Append(signedIn ? $"{colorOpen}Your journey is safe.{colorClose}" : $"{colorOpen}Log in to save your journey.{colorClose}");
+                sb.AppendLine(GetPlayerInfoText());
+            }
 
             string status = sb.ToString();
+            string profileStatus = sb2.ToString();
+
             ApplyUiState(m_StatusText, m_SignOut, m_SignIn, signedIn, status);
             ApplyUiState(m_ExternalStatusText, m_ExternalSignOut, m_ExternalSignIn, signedIn, status);
+            ApplyUiState(m_ExternalProfileStatusText, m_ExternalSignOut, m_ExternalSignIn, signedIn, profileStatus);
         }
 
         private static void ApplyUiState(TMP_Text statusText, GameObject signOut, GameObject signIn, bool signedIn, string status)

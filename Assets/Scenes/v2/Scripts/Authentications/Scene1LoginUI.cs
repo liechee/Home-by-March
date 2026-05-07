@@ -14,9 +14,12 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         [Header("UI References")]
         [SerializeField] TMP_InputField m_GuestNameInput;
         [SerializeField] NameChangePanel m_NameChangePanel;
+        [SerializeField] Button         m_PlayButton;
         [SerializeField] Button         m_PlayAsGuestBtn;
-        [SerializeField] Button         m_SignInBtn;
+        [SerializeField] Button         m_LogInBtn;
         [SerializeField] TMP_Text       m_StatusText;
+        [SerializeField] GameObject     m_SignInPanel;
+        [SerializeField] GameObject     m_LoginButtonsPanel;
 
         [Header("Scene Changer")]
         [Tooltip("Drag the GameObject that has SceneChanger on it here.")]
@@ -36,8 +39,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             SetButtonsInteractable(false);
             SetStatus("Loading…");
 
+            m_PlayButton?.onClick.AddListener(OnPlayClicked);
             m_PlayAsGuestBtn?.onClick.AddListener(OnPlayAsGuestClicked);
-            m_SignInBtn?.onClick.AddListener(OnSignInClicked);
+            m_LogInBtn?.onClick.AddListener(OnSignInClicked);
 
             Debug.Log("[Scene1LoginUI] Initializing Unity Services...");
             await UnityServices.InitializeAsync();
@@ -46,11 +50,24 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             PlayerAccountService.Instance.SignedIn += OnPlayerAccountSignedIn;
             Debug.Log("[Scene1LoginUI] Unity Services ready.");
 
+            // If we're already signed-in (e.g. signed in from Scene 2 earlier),
+            // hide the login buttons panel so it stays inactive across scenes.
+            if (AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn)
+            {
+                if (m_LoginButtonsPanel != null)
+                    m_LoginButtonsPanel.SetActive(false);
+                SetButtonsInteractable(true);
+                Debug.Log("[Scene1LoginUI] Already signed-in; hiding login-buttons panel.");
+            }
             // Auto-restore on launch:
             // 1) Unity session token (signed-in users)
             // 2) Guest handoff key (guest users)
             if (await TryAutoResumeSessionOrGuestAsync())
+            {
+                SetButtonsInteractable(true);
+                Debug.Log("[Scene1LoginUI] Auto-resume succeeded. Buttons enabled.");
                 return;
+            }
 
             // No restorable session found: keep Scene 1 visible and wait for input.
             SetStatus("");
@@ -83,8 +100,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                         PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
                         PlayerPrefs.SetInt(Scene1SignedInKey, 1);
                         PlayerPrefs.Save();
-                        Debug.Log("[Scene1LoginUI] Silent sign-in succeeded. Loading Scene 2...");
-                        GoToScene2();
+                        Debug.Log("[Scene1LoginUI] Silent sign-in succeeded. Hiding login panel...");
+                        if (m_SignInPanel != null)
+                            m_SignInPanel.SetActive(false);
+                        if (m_LoginButtonsPanel != null)
+                            m_LoginButtonsPanel.SetActive(false);
                         return true;
                     }
                 }
@@ -102,8 +122,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 {
                     PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
                     PlayerPrefs.Save();
-                    Debug.Log($"[Scene1LoginUI] Restored guest '{guestName}'. Loading Scene 2...");
-                    GoToScene2();
+                    Debug.Log($"[Scene1LoginUI] Restored guest '{guestName}'. Hiding login panel...");
+                    if (m_SignInPanel != null)
+                        m_SignInPanel.SetActive(false);
                     return true;
                 }
             }
@@ -119,10 +140,41 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         // ── Button handlers ───────────────────────────────────────────────────────
 
+        private void OnPlayClicked()
+        {
+            Debug.Log("[Scene1LoginUI] Play clicked.");
+
+            if (HasExistingPlayerData())
+            {
+                Debug.Log("[Scene1LoginUI] Existing player data found. Loading Scene 2...");
+                GoToScene2();
+                return;
+            }
+
+            if (m_SignInPanel != null)
+                m_SignInPanel.SetActive(true);
+
+            SetStatus("");
+            Debug.Log("[Scene1LoginUI] No existing data found. Showing sign-in panel.");
+        }
+
         private void OnPlayAsGuestClicked()
         {
             Debug.Log("[Scene1LoginUI] Play As Guest clicked.");
 
+            // Check if player data already exists
+            if (PlayerPrefs.HasKey(AuthManager.PrefGuestName))
+            {
+                string existingGuestName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+                if (!string.IsNullOrEmpty(existingGuestName))
+                {
+                    Debug.Log($"[Scene1LoginUI] Guest player '{existingGuestName}' already exists. Loading Scene 2...");
+                    GoToScene2();
+                    return;
+                }
+            }
+
+            // No existing player data, show username input panel
             if (m_NameChangePanel != null)
             {
                 if (!m_NameChangePanel.TryPrepareGuestFromInput(m_GuestNameInput, out string validationMessage))
@@ -162,7 +214,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             SetStatus("Opening sign-in…");
             SetButtonsInteractable(false);
             _waitingForPlayerAccountReturn = true;
-            _signInCompletionHandled = false;
+            _signInCompletionHandled = false;  // Reset for retry
 
             try
             {
@@ -190,6 +242,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 SetStatus("Sign-in failed. Try again.");
                 Debug.LogError("[Scene1LoginUI] Sign-in failed.");
                 _waitingForPlayerAccountReturn = false;
+                _signInCompletionHandled = false;  // Allow retry
                 SetButtonsInteractable(true);
             }
         }
@@ -239,6 +292,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 SetStatus("Sign-in failed. Try again.");
                 Debug.LogError("[Scene1LoginUI] Sign-in failed.");
                 _waitingForPlayerAccountReturn = false;
+                _signInCompletionHandled = false;  // Allow retry
                 SetButtonsInteractable(true);
             }
         }
@@ -263,8 +317,30 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         private void SetButtonsInteractable(bool on)
         {
+            if (m_PlayButton       != null) m_PlayButton.interactable       = on;
             if (m_PlayAsGuestBtn != null) m_PlayAsGuestBtn.interactable = on;
-            if (m_SignInBtn      != null) m_SignInBtn.interactable      = on;
+            if (m_LogInBtn      != null) m_LogInBtn.interactable      = on;
+        }
+
+        private bool HasExistingPlayerData()
+        {
+            if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+                return false;
+
+            if (AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn)
+                return true;
+
+            if (AuthenticationService.Instance != null && AuthenticationService.Instance.SessionTokenExists)
+                return true;
+
+            if (PlayerPrefs.HasKey(AuthManager.PrefGuestName))
+            {
+                string guestName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+                if (!string.IsNullOrEmpty(guestName))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

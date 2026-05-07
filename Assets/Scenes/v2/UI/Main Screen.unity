@@ -679,7 +679,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Are you sure you want to sign out?
+  m_text: Are you sure you want to log out?
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -706,7 +706,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
+  m_fontSize: 36.65
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -1031,7 +1031,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: To fully complete sign out, please close and reopen the app.
+  m_text: To fully complete log out, please close and reopen the app.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -15359,7 +15359,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_StatusText: {fileID: 507357113}
-  m_profileStatusText: {fileID: 726918648}
+  m_profileStatusText: {fileID: 0}
   m_SignOutBtn: {fileID: 112985304}
   m_SignInBtn: {fileID: 711272778}
   m_WaitingText: {fileID: 0}
@@ -15380,6 +15380,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2398b803a5eeb6448ade76fae3bc088a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_ProfileStatusText: {fileID: 726918648}
 --- !u!1 &1089626492
 GameObject:
   m_ObjectHideFlags: 0
@@ -23333,7 +23334,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Sign out
+  m_text: Log out
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -24380,7 +24381,7 @@ MonoBehaviour:
 
 
 
-    You can sign in again later to restore your progress.'
+    You can log in again later to restore your progress.'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -32442,7 +32443,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_StatusText: {fileID: 507357113}
-  m_profileStatusText: {fileID: 726918648}
+  m_profileStatusText: {fileID: 0}
   m_SignOutBtn: {fileID: 112985304}
   m_SignInBtn: {fileID: 711272778}
   m_WaitingText: {fileID: 0}

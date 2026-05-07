@@ -9,7 +9,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
     public class PlayerAccountsDemo : MonoBehaviour
     {
         [SerializeField] TMP_Text m_StatusText;
-        [SerializeField] TMP_Text m_profileStatusText;
         [SerializeField] GameObject m_SignOut;
         [SerializeField] GameObject m_SignIn;
 
@@ -228,7 +227,6 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             ApplyUiState(m_StatusText, m_SignOut, m_SignIn, signedIn, status);
             ApplyUiState(m_ExternalStatusText, m_ExternalSignOut, m_ExternalSignIn, signedIn, status);
-            ApplyUiState(m_profileStatusText, m_SignOut, m_SignIn, signedIn, profileStatus);
             ApplyUiState(m_ExternalProfileStatusText, m_ExternalSignOut, m_ExternalSignIn, signedIn, profileStatus);
         }
 

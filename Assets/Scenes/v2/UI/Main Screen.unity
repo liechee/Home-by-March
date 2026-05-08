@@ -1195,14 +1195,14 @@ MonoBehaviour:
         m_TargetAssemblyTypeName: Unity.Services.Authentication.PlayerAccounts.Samples.PlayerAccountsDemo,
           Assembly-CSharp
         m_MethodName: SignOut
-        m_Mode: 1
+        m_Mode: 6
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
-          m_BoolArgument: 0
+          m_BoolArgument: 1
         m_CallState: 2
       - m_Target: {fileID: 6236241055500105821}
         m_TargetAssemblyTypeName: LogOutManager, Assembly-CSharp
@@ -2370,7 +2370,7 @@ PrefabInstance:
     - target: {fileID: 6302605620922318252, guid: 7fa42003425fac142ab63f374c01c2f7, type: 3}
       propertyPath: playerData
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1088589307}
     - target: {fileID: 6302605620922318252, guid: 7fa42003425fac142ab63f374c01c2f7, type: 3}
       propertyPath: resultHandler
       value: 

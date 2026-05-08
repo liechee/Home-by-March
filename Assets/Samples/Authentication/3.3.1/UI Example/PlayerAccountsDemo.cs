@@ -47,7 +47,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             UpdateUI();
         }
-        
+
 
         public async void StartSignInAsync()
         {
@@ -108,7 +108,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         }
 
 
-        public void SignOut()
+        public void SignOut(bool clearSessionToken = false)
         {
             LogOutManager logoutManager = FindObjectOfType<LogOutManager>();
             if (logoutManager != null)
@@ -121,6 +121,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 Debug.LogWarning("[Auth] LogOutManager not found — doing bare sign-out. " +
                     "Add LogOutManager to the scene for a proper wipe.");
                 AuthenticationService.Instance.SignOut();
+                PlayerAccountService.Instance.SignOut();
+                // Sign out of Unity Authentication, with the option to clear the session token
+                AuthenticationService.Instance.SignOut(clearSessionToken);
+
+                // Sign out of Unity Player Accounts
                 PlayerAccountService.Instance.SignOut();
                 UpdateUI();
             }
@@ -219,7 +224,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             if (signedIn)
             {
                 sb2.Append(signedIn ? $"{colorOpen}Your journey is safe.{colorClose}" : $"{colorOpen}Log in to save your journey.{colorClose}");
-                sb.AppendLine(GetPlayerInfoText());
+                sb.AppendLine();
             }
 
             string status = sb.ToString();

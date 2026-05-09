@@ -1191,19 +1191,6 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 6236241055500105815}
-        m_TargetAssemblyTypeName: Unity.Services.Authentication.PlayerAccounts.Samples.PlayerAccountsDemo,
-          Assembly-CSharp
-        m_MethodName: SignOut
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 1
-        m_CallState: 2
       - m_Target: {fileID: 6236241055500105821}
         m_TargetAssemblyTypeName: LogOutManager, Assembly-CSharp
         m_MethodName: LogoutAndRestart
@@ -15359,7 +15346,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_StatusText: {fileID: 507357113}
-  m_profileStatusText: {fileID: 0}
   m_SignOutBtn: {fileID: 112985304}
   m_SignInBtn: {fileID: 711272778}
   m_WaitingText: {fileID: 0}
@@ -32412,7 +32398,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 7022585422058364402}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6236241055500105808}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0a4a3f06ee566f140978eee8a4734310, type: 3}
   m_Name: 
@@ -32430,6 +32416,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loadingPanel: {fileID: 1089626492}
+  loginSceneName: LogIn Screen 1
+  reloadDelay: 2
 --- !u!114 &6236241055500105822
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -32443,7 +32431,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_StatusText: {fileID: 507357113}
-  m_profileStatusText: {fileID: 0}
   m_SignOutBtn: {fileID: 112985304}
   m_SignInBtn: {fileID: 711272778}
   m_WaitingText: {fileID: 0}
@@ -32781,6 +32768,10 @@ PrefabInstance:
     - target: {fileID: 1450513602070631526, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[2].m_Arguments.m_ObjectArgumentAssemblyTypeName
       value: UnityEngine.Object, UnityEngine
+      objectReference: {fileID: 0}
+    - target: {fileID: 1799050185136230639, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1799050185136230639, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       propertyPath: m_SignOut

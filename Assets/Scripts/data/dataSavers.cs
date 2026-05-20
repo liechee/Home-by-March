@@ -59,6 +59,7 @@ public class DailyQuestProgress
 }
 
 
+[System.Serializable]
 public class PlayerDataSaver
 {
   public string playerName;

@@ -1,38 +1,51 @@
 using System.Collections;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 
 namespace Unity.Services.Authentication.PlayerAccounts.Samples
 {
+    /// <summary>
+    /// Scene 2 auth UI.
+    ///
+    /// Responsibilities:
+    ///   - Subscribe to AuthManager.OnStateChanged and reflect state in the UI.
+    ///   - Trigger cloud data loads exactly once per sign-in.
+    ///   - Route sign-out to LogOutManager (full wipe) or AuthManager (in-memory only).
+    ///
+    /// This script owns NO auth logic — everything goes through AuthManager.
+    /// </summary>
     public class Scene2AuthUI : MonoBehaviour
     {
+        // ── Inspector ─────────────────────────────────────────────────────────────
+
         [Header("Status UI")]
         [SerializeField] TMP_Text m_StatusText;
-        [SerializeField] TMP_Text m_profileStatusText;
-        [Header("Buttons (must be active in hierarchy by default)")]
-        [SerializeField] GameObject m_SignOutBtn;   // visible for both guest and signed-in
-        [SerializeField] GameObject m_SignInBtn;    // visible for guest only
+
+        [Header("Buttons")]
+        [SerializeField] GameObject m_SignOutBtn;
+        [SerializeField] GameObject m_SignInBtn;
+        [SerializeField] GameObject m_ButtonContainer;
 
         [Header("Optional")]
-        [SerializeField] TMP_Text m_WaitingText;  // "Waiting for sign-in…" shown during portal
+        [SerializeField] TMP_Text m_WaitingText;
 
-        [Header("Scene Changer")]
-        [Tooltip("Drag the GameObject that has SceneChanger on it here.")]
+        [Header("Navigation")]
         [SerializeField] SceneChanger m_SceneChanger;
-        [Tooltip("Name of Scene 1 as it appears in Build Settings.")]
-        [SerializeField] string m_Scene1Name = "Scene1";
+        [SerializeField] string m_Scene1Name = "Entry Screen 1";
 
-        [Header("Optional: cloud-load systems")]
-        [SerializeField] OverallStepCounter m_StepCounter;
+        [Header("Cloud-load targets (auto-resolved if left empty)")]
+        [SerializeField] OverallStepCounter        m_StepCounter;
         [SerializeField] PlayerPrefsCloudSyncButton m_SyncButton;
-        [SerializeField] PlayerData m_PlayerData;
+        [SerializeField] PlayerData                 m_PlayerData;
 
-        private bool _waitingForPortalReturn = false;
-        private bool _cloudLoadTriggeredForSignedInSession = false;
+        // ── Private state ─────────────────────────────────────────────────────────
 
-        // ─────────────────────────────────────────────────────────────────────────
+        private bool _waitingForPortalReturn;
+        private bool _cloudLoadTriggered;
+
+        // ── Unity lifecycle ───────────────────────────────────────────────────────
 
         private void OnEnable()
         {
@@ -48,8 +61,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         private void OnApplicationFocus(bool hasFocus)
         {
-            // App regains focus after player returns from the Unity Account portal
-            if (hasFocus && _waitingForPortalReturn)
+            // Player returned from the Unity Account portal.
+            if (hasFocus && _waitingForPortalReturn && AuthManager.Instance != null)
                 _ = AuthManager.Instance.StartUnitySignInAsync();
         }
 
@@ -57,33 +70,27 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         {
             SetWaitingText(false);
 
-            // Ensure buttons have safe default state before auth state is known
-            // (prevents showing unauthenticated buttons on first frame if scene loads faster than auth)
-            if (m_SignOutBtn != null) m_SignOutBtn.SetActive(false);
-            if (m_SignInBtn != null) m_SignInBtn.SetActive(false);
-            Debug.Log("[Scene2AuthUI] Buttons hidden during init.");
+            // Hide buttons until we know the auth state (avoids a one-frame flicker).
+            m_SignOutBtn?.SetActive(false);
+            m_SignInBtn?.SetActive(true);
+            m_ButtonContainer?.SetActive(false);
 
-            // Clean re-subscribe after all Awakes have run (guards against OnEnable
-            // firing before AuthManager.Awake sets Instance)
+            // Re-subscribe in case OnEnable fired before AuthManager.Awake completed.
             if (AuthManager.Instance != null)
             {
                 AuthManager.Instance.OnStateChanged -= OnAuthStateChanged;
                 AuthManager.Instance.OnStateChanged += OnAuthStateChanged;
             }
 
-            // Also register this UI as the external target on PlayerAccountsDemo
-            // so both UIs mirror each other (matches SetExternalUiTargets pattern)
-            var demo = FindObjectOfType<PlayerAccountsDemo>();
-            if (demo != null)
-                demo.SetExternalUiTargets(m_StatusText, m_profileStatusText, m_SignOutBtn, m_SignInBtn);
-
-            // Wait for AuthManager.IsReady before drawing — avoids the race condition
-            // where RefreshUI() reads state before InitAsync() has finished
             StartCoroutine(WaitForAuthThenRefresh());
         }
 
-        // ── Wait for AuthManager ──────────────────────────────────────────────────
+        // ── Auth-ready coroutine ──────────────────────────────────────────────────
 
+        /// <summary>
+        /// Polls until AuthManager.IsReady, then fires an initial UI refresh.
+        /// Handles the race between this MonoBehaviour's Start and AuthManager's async init.
+        /// </summary>
         private IEnumerator WaitForAuthThenRefresh()
         {
             const float kTimeout = 10f;
@@ -91,74 +98,67 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             while (elapsed < kTimeout)
             {
-                if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
-                    break;
+                if (AuthManager.Instance != null && AuthManager.Instance.IsReady) break;
                 elapsed += Time.deltaTime;
                 yield return null;
             }
 
             if (elapsed >= kTimeout)
-            {
-                Debug.LogWarning("[Scene2AuthUI] Timed out waiting for AuthManager — forcing refresh.");
-                OnAuthStateChanged();
-                yield break;
-            }
+                Debug.LogWarning("[Scene2AuthUI] Timed out waiting for AuthManager.IsReady.");
 
-            // Apply the current auth state explicitly once ready.
-            // This avoids missing cloud-load trigger if the initial auth event fired
-            // before this component finished subscribing.
-            Debug.Log($"[Scene2AuthUI] AuthManager ready. CurrentMode={AuthManager.Instance.CurrentMode}, " +
-                      $"IsSignedIn={AuthManager.Instance.IsSignedIn}, " +
-                      $"AuthService.IsSignedIn={Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn}");
             OnAuthStateChanged();
         }
 
-        // ── Auth state → UI ───────────────────────────────────────────────────────
+        // ── Auth state handler ────────────────────────────────────────────────────
 
         private void OnAuthStateChanged()
         {
             RefreshUI();
 
+            // Reset cloud-load gate if we're no longer signed in.
             if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn)
             {
-                _cloudLoadTriggeredForSignedInSession = false;
+                _cloudLoadTriggered = false;
                 return;
             }
 
-            // Whenever we land on a signed-in state, trigger cloud loads
-            if (!_cloudLoadTriggeredForSignedInSession)
+            // Skip cloud load if logout is in progress (race condition guard).
+            if (m_StepCounter != null && m_StepCounter.isLoggingOut)
             {
-                _cloudLoadTriggeredForSignedInSession = true;
-
-                if (_waitingForPortalReturn)
-                {
-                    _waitingForPortalReturn = false;
-                    SetWaitingText(false);
-                }
-                _ = TriggerCloudLoadsAsync();
+                Debug.Log("[Scene2AuthUI] OnAuthStateChanged called during logout — skipping cloud load.");
+                _cloudLoadTriggered = false;
+                return;
             }
+
+            // Trigger cloud load exactly once per sign-in.
+            if (_cloudLoadTriggered) return;
+            _cloudLoadTriggered = true;
+
+            if (_waitingForPortalReturn)
+            {
+                _waitingForPortalReturn = false;
+                SetWaitingText(false);
+            }
+
+            _ = TriggerCloudLoadsAsync();
         }
+
+        // ── UI refresh ────────────────────────────────────────────────────────────
 
         private void RefreshUI()
         {
             if (AuthManager.Instance == null) return;
 
-            bool isGuest = AuthManager.Instance.IsGuest;
+            bool isGuest    = AuthManager.Instance.IsGuest;
             bool isSignedIn = AuthManager.Instance.IsSignedIn;
             bool hasSession = isGuest || isSignedIn;
 
-            Debug.Log($"[Scene2AuthUI] RefreshUI — isGuest={isGuest}, isSignedIn={isSignedIn}, " +
-                      $"hasSession={hasSession}, _waitingForPortalReturn={_waitingForPortalReturn}");
-
-            // ── Status text — mirrors PlayerAccountsDemo.UpdateUI() logic ─────────
             if (m_StatusText != null)
             {
                 var sb = new StringBuilder();
-
                 if (isSignedIn)
                 {
-                    sb.AppendLine("Bound to the world. Your journey is safe.");
-                    sb.AppendLine($"ExternalIds: <b>{AuthManager.Instance.ExternalIds}</b>");
+                    sb.AppendLine("Your journey is bound. Save your progress and carry every step with you — continue your march home from any device, anywhere.");
                 }
                 else if (isGuest)
                 {
@@ -167,124 +167,99 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 }
                 else
                 {
-                    sb.AppendLine("Your journey is not yet bound. Sign in to preserve your path");
+                    sb.AppendLine("Your progress is not yet safe. Log in to save your journey and carry every step with you — continue from any device, anywhere.");
                 }
-
                 m_StatusText.text = sb.ToString();
             }
-            if (m_profileStatusText != null)
-            {
-                var stat = new StringBuilder();
-                const string colorOpen = "<color=#FFEE00>";
-                const string colorClose = "</color>";
-                if (isSignedIn)
-                {
-                    stat.AppendLine($"{colorOpen}Your journey is safe.{colorClose}");
-                }
-                else if (isGuest)
-                {
-                    stat.AppendLine($"{colorOpen}Log in to save your journey.{colorClose}");
-                }
-                else
-                {
-                    stat.AppendLine($"{colorOpen}Log in to save your journey.{colorClose}");
-                }
-                m_profileStatusText.text = stat.ToString();
-            }
 
-            // ── Button visibility — mirrors PlayerAccountsDemo.ApplyUiState() ─────
-            // Sign-out: visible whenever any session exists (guest OR signed-in)
-            if (m_SignOutBtn != null)
-            {
-                bool signOutActive = hasSession;
-                m_SignOutBtn.SetActive(signOutActive);
-                Debug.Log($"[Scene2AuthUI] Sign-out button: {(signOutActive ? "ACTIVE" : "INACTIVE")}");
-            }
+            // Sign-out button: show whenever there is any active session.
+            m_ButtonContainer?.SetActive(true);
+            m_SignOutBtn?.SetActive(hasSession);
 
-            // Sign-in: visible whenever not signed in (guest OR none)
-            if (m_SignInBtn != null)
-            {
-                bool signInActive = !isSignedIn && !_waitingForPortalReturn;
-                m_SignInBtn.SetActive(signInActive);
-                Debug.Log($"[Scene2AuthUI] Sign-in button: {(signInActive ? "ACTIVE" : "INACTIVE")}");
-            }
+            // Sign-in button: show when not signed in and not waiting for the portal.
+            m_SignInBtn?.SetActive(!isSignedIn && !_waitingForPortalReturn);
         }
 
-        // ── Button callbacks — wire these up in the Inspector ────────────────────
+        // ── Button callbacks ──────────────────────────────────────────────────────
 
         /// <summary>Attach to the Sign In button's OnClick.</summary>
-        public void OnSignInButtonClicked()
+        public async void OnSignInButtonClicked()
         {
             if (AuthManager.Instance == null) return;
-            AuthManager.Instance.OpenAccountPortal();
+
             _waitingForPortalReturn = true;
             SetWaitingText(true);
-            // Hide sign-in button while we wait
-            if (m_SignInBtn != null) m_SignInBtn.SetActive(false);
+            m_SignInBtn?.SetActive(false);
+
+            await AuthManager.Instance.StartUnitySignInAsync();
         }
 
-        /// <summary>Attach to the Sign Out button's OnClick.</summary>
+        /// <summary>
+        /// Attach to the Sign Out button's OnClick.
+        /// Routes to LogOutManager for a full local data wipe + scene reload.
+        /// </summary>
         public void OnSignOutButtonClicked()
         {
             if (AuthManager.Instance == null) return;
-            AuthManager.Instance.SignOut();
+
             LogOutManager logoutManager = FindObjectOfType<LogOutManager>();
             if (logoutManager != null)
             {
                 logoutManager.LogoutAndRestart();
             }
+            else
+            {
+                Debug.LogError("[Scene2AuthUI] LogOutManager not found — add it to the scene. " +
+                               "Falling back to in-memory sign-out (no data wipe).");
+                AuthManager.Instance.SignOut();
+                NavigateToScene1();
+            }
         }
 
         // ── Cloud loads ───────────────────────────────────────────────────────────
 
-        private async System.Threading.Tasks.Task TriggerCloudLoadsAsync()
+        private async Task TriggerCloudLoadsAsync()
         {
-            ResolveCloudLoadTargets();
+            ResolveCloudTargets();
 
             if (m_StepCounter != null && !m_StepCounter.cloudLoaded)
             {
-                Debug.Log("[Scene2AuthUI] Triggering step data cloud load.");
+                Debug.Log("[Scene2AuthUI] Loading step data from cloud.");
                 await m_StepCounter.LoadStepDataFromCloud();
             }
 
             if (m_SyncButton != null)
             {
-                Debug.Log("[Scene2AuthUI] Triggering non-step cloud load.");
+                Debug.Log("[Scene2AuthUI] Loading non-step data from cloud.");
                 await m_SyncButton.LoadFromCloudAsync();
             }
             else if (m_PlayerData != null)
             {
-                Debug.Log("[Scene2AuthUI] Triggering player data cloud load.");
+                Debug.Log("[Scene2AuthUI] Loading player data from cloud.");
                 await m_PlayerData.LoadPlayerDataFromCloud();
             }
 
-            if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn &&
-                (m_StepCounter == null || m_StepCounter.cloudLoaded))
+            // Persist confirmation that a cloud session is active so
+            // PlayerProfileStatus can read it without waiting for AuthManager.
+            if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
             {
-                PlayerPrefs.SetInt("PlayerSignedIn", 1);
+                PlayerPrefs.SetInt(AuthManager.PrefPlayerSignedIn, 1);
                 PlayerPrefs.Save();
             }
         }
 
-        private void ResolveCloudLoadTargets()
+        /// <summary>
+        /// Auto-resolves any cloud-target inspector slots left unassigned.
+        /// </summary>
+        private void ResolveCloudTargets()
         {
-            // Mirror PlayerAccountsDemo's FindObjectOfType pattern so auth/data loading
-            // still works even if one inspector field is left unassigned.
-            if (m_StepCounter == null)
-                m_StepCounter = FindObjectOfType<OverallStepCounter>();
+            if (m_StepCounter == null) m_StepCounter = FindObjectOfType<OverallStepCounter>();
+            if (m_SyncButton  == null) m_SyncButton  = FindObjectOfType<PlayerPrefsCloudSyncButton>();
+            if (m_PlayerData  == null) m_PlayerData  = FindObjectOfType<PlayerData>();
 
-            if (m_SyncButton == null)
-                m_SyncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
-
-            if (m_PlayerData == null)
-                m_PlayerData = FindObjectOfType<PlayerData>();
-
-            if (m_StepCounter == null)
-                Debug.LogWarning("[Scene2AuthUI] OverallStepCounter not found — step cloud load skipped.");
-            if (m_SyncButton == null)
-                Debug.LogWarning("[Scene2AuthUI] PlayerPrefsCloudSyncButton not found — non-step cloud load skipped.");
-            if (m_PlayerData == null)
-                Debug.LogWarning("[Scene2AuthUI] PlayerData not found — player data cloud load skipped.");
+            if (m_StepCounter == null) Debug.LogWarning("[Scene2AuthUI] OverallStepCounter not found.");
+            if (m_SyncButton  == null) Debug.LogWarning("[Scene2AuthUI] PlayerPrefsCloudSyncButton not found.");
+            if (m_PlayerData  == null) Debug.LogWarning("[Scene2AuthUI] PlayerData not found.");
         }
 
         // ── Navigation ────────────────────────────────────────────────────────────
@@ -301,11 +276,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
         private void SetWaitingText(bool visible)
         {
-            if (m_WaitingText != null)
-            {
-                m_WaitingText.gameObject.SetActive(visible);
-                if (visible) m_WaitingText.text = "Waiting for sign-in…";
-            }
+            if (m_WaitingText == null) return;
+            m_WaitingText.gameObject.SetActive(visible);
+            if (visible) m_WaitingText.text = "Waiting for sign-in…";
         }
     }
 }

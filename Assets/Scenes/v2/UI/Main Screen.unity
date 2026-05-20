@@ -12402,6 +12402,7 @@ GameObject:
   m_Component:
   - component: {fileID: 803456037}
   - component: {fileID: 803456038}
+  - component: {fileID: 803456039}
   m_Layer: 5
   m_Name: Profile
   m_TagString: Untagged
@@ -12460,6 +12461,19 @@ MonoBehaviour:
   totalStepsForNextLevel: 0
   remainingStepsForNextLevel: 0
   debugStepLogs: 0
+--- !u!114 &803456039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 803456036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2398b803a5eeb6448ade76fae3bc088a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_ProfileStatusText: {fileID: 726918648}
 --- !u!1 &804733405
 GameObject:
   m_ObjectHideFlags: 0
@@ -14933,7 +14947,6 @@ GameObject:
   - component: {fileID: 1088589302}
   - component: {fileID: 1088589303}
   - component: {fileID: 1088589304}
-  - component: {fileID: 1088589315}
   - component: {fileID: 1088589305}
   - component: {fileID: 1088589306}
   - component: {fileID: 1088589307}
@@ -14943,8 +14956,6 @@ GameObject:
   - component: {fileID: 1088589310}
   - component: {fileID: 1088589312}
   - component: {fileID: 1088589313}
-  - component: {fileID: 1088589316}
-  - component: {fileID: 1088589317}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -15321,52 +15332,6 @@ MonoBehaviour:
   loadDelay: 0.5
   inventoryCloudKey: PlayerInventory
   equipmentCloudKey: PlayerEquip
---- !u!114 &1088589315
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1088589290}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e1750bdd49e489408ca76f942718eff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &1088589316
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1088589290}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f6f1565565c26443803c5d7572b185e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_StatusText: {fileID: 507357113}
-  m_SignOutBtn: {fileID: 112985304}
-  m_SignInBtn: {fileID: 711272778}
-  m_WaitingText: {fileID: 0}
-  m_SceneChanger: {fileID: 1088589301}
-  m_Scene1Name: LogIn Screen 2
-  m_StepCounter: {fileID: 0}
-  m_SyncButton: {fileID: 0}
-  m_PlayerData: {fileID: 1088589307}
---- !u!114 &1088589317
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1088589290}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2398b803a5eeb6448ade76fae3bc088a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_ProfileStatusText: {fileID: 726918648}
 --- !u!1 &1089626492
 GameObject:
   m_ObjectHideFlags: 0
@@ -20561,7 +20526,7 @@ GameObject:
   - component: {fileID: 1486506650}
   - component: {fileID: 1486506649}
   m_Layer: 5
-  m_Name: Player Name
+  m_Name: Player Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -32392,17 +32357,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 4245675383076336781, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
   m_PrefabInstance: {fileID: 7022585422058364402}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &6236241055500105815 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1799050185136230639, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
-  m_PrefabInstance: {fileID: 7022585422058364402}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6236241055500105808}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0a4a3f06ee566f140978eee8a4734310, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &6236241055500105821
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -32416,7 +32370,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loadingPanel: {fileID: 1089626492}
-  loginSceneName: LogIn Screen 1
+  loginSceneName: Entry Screen 1
   reloadDelay: 2
 --- !u!114 &6236241055500105822
 MonoBehaviour:
@@ -32425,7 +32379,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6236241055500105808}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8f6f1565565c26443803c5d7572b185e, type: 3}
   m_Name: 
@@ -32433,12 +32387,25 @@ MonoBehaviour:
   m_StatusText: {fileID: 507357113}
   m_SignOutBtn: {fileID: 112985304}
   m_SignInBtn: {fileID: 711272778}
+  m_ButtonContainer: {fileID: 443317400}
   m_WaitingText: {fileID: 0}
   m_SceneChanger: {fileID: 1088589301}
-  m_Scene1Name: LogIn Screen 2
+  m_Scene1Name: Entry Screen 1
   m_StepCounter: {fileID: 0}
   m_SyncButton: {fileID: 0}
   m_PlayerData: {fileID: 1088589307}
+--- !u!114 &6236241055500105823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6236241055500105808}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e1750bdd49e489408ca76f942718eff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!224 &6531544245876695556
 RectTransform:
   m_ObjectHideFlags: 0
@@ -32890,12 +32857,44 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_Mode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 6236241055500105815}
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_Target
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: StartSignInAsync
+      value: OnSignInButtonClicked
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_MethodName
+      value: OnSignInButtonClicked
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: Unity.Services.Authentication.PlayerAccounts.Samples.Scene2AuthUI, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_TargetAssemblyTypeName
+      value: Unity.Services.Authentication.PlayerAccounts.Samples.Scene2AuthUI, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 3180967381714978480, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[1].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
     - target: {fileID: 3447160450578474019, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       propertyPath: m_Sprite
@@ -33423,7 +33422,8 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 445
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 1799050185136230639, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
     m_RemovedGameObjects:
     - {fileID: 4479472968194442055, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
     m_AddedGameObjects:
@@ -33437,6 +33437,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4245675383076336781, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6236241055500105822}
+    - targetCorrespondingSourceObject: {fileID: 4245675383076336781, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6236241055500105823}
   m_SourcePrefab: {fileID: 100100000, guid: 673e300cddf96d04c9301c8910a8b3a3, type: 3}
 --- !u!224 &7075939102892964026
 RectTransform:

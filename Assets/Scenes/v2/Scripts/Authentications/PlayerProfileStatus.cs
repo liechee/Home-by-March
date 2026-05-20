@@ -7,19 +7,31 @@ using TMPro;
 using System.Text;
 using UnityEngine.SceneManagement;
 
+/// <summary>
+/// Displays a short signed-in / signed-out status string on any TMP_Text component.
+///
+/// Safe to place in any scene (including persistent canvases). Subscribes to both
+/// AuthManager.OnStateChanged (primary) and the raw AuthenticationService events
+/// (fallback for scenes that load before AuthManager is ready).
+/// </summary>
 public class PlayerProfileStatus : MonoBehaviour
 {
+    // ── Inspector ─────────────────────────────────────────────────────────────
+
     [SerializeField] TMP_Text m_ProfileStatusText;
-    Coroutine _waitForAuthCoroutine;
+
+    // ── Private state ─────────────────────────────────────────────────────────
+
+    private Coroutine _refreshCoroutine;
+
+    // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     private async void Awake()
     {
+        // Ensure Unity Services are ready before we touch AuthenticationService.
         if (UnityServices.State == ServicesInitializationState.Uninitialized)
         {
-            try
-            {
-                await UnityServices.InitializeAsync();
-            }
+            try { await UnityServices.InitializeAsync(); }
             catch (System.Exception ex)
             {
                 Debug.LogWarning($"[PlayerProfileStatus] Unity Services init failed: {ex.Message}");
@@ -37,9 +49,7 @@ public class PlayerProfileStatus : MonoBehaviour
         TrySubscribeAuthEvents();
         TrySubscribeAuthManager();
         SceneManager.sceneLoaded += OnSceneLoaded;
-
         RequestRefresh();
-        RegisterWithPlayerAccountsDemo();
     }
 
     private void OnDisable()
@@ -47,32 +57,22 @@ public class PlayerProfileStatus : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
         UnsubscribeAuthEvents();
         UnsubscribeAuthManager();
-        if (_waitForAuthCoroutine != null)
-        {
-            StopCoroutine(_waitForAuthCoroutine);
-            _waitForAuthCoroutine = null;
-        }
+        StopRefreshCoroutine();
     }
 
-    private void RegisterWithPlayerAccountsDemo()
+    private void OnDestroy()
     {
-        ResolveProfileText();
-        if (m_ProfileStatusText == null) return;
-
-        var demo = FindObjectOfType<PlayerAccountsDemo>();
-        if (demo != null)
-            demo.SetExternalUiTargets(null, m_ProfileStatusText, null, null);
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnsubscribeAuthEvents();
+        UnsubscribeAuthManager();
     }
 
-    private void OnAuthChanged()
-    {
-        RequestRefresh();
-    }
+    // ── Event handlers ────────────────────────────────────────────────────────
 
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        RequestRefresh();
-    }
+    private void OnAuthChanged()    => RequestRefresh();
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode) => RequestRefresh();
+
+    // ── Refresh logic ─────────────────────────────────────────────────────────
 
     private void RequestRefresh()
     {
@@ -82,70 +82,115 @@ public class PlayerProfileStatus : MonoBehaviour
 
         if (m_ProfileStatusText == null)
         {
-            Debug.LogWarning("[PlayerProfileStatus] No TMP_Text found to update.");
+            Debug.LogWarning("[PlayerProfileStatus] No TMP_Text target found.");
             return;
         }
 
-        if (_waitForAuthCoroutine != null)
-            StopCoroutine(_waitForAuthCoroutine);
-
-        _waitForAuthCoroutine = StartCoroutine(RefreshUntilAuthReady());
+        StopRefreshCoroutine();
+        _refreshCoroutine = StartCoroutine(RefreshUntilAuthReady());
     }
 
+    /// <summary>
+    /// Polls for up to <c>timeout</c> seconds until AuthManager.IsReady, then
+    /// performs a final status update. Updates the text on every frame so the
+    /// player sees a result immediately even before the manager is ready.
+    /// </summary>
     private IEnumerator RefreshUntilAuthReady()
     {
         const float timeout = 5f;
         float elapsed = 0f;
 
-        yield return null;
+        yield return null;  // skip the frame we were requested on
 
         while (elapsed < timeout)
         {
             ResolveProfileText();
-
-            if (m_ProfileStatusText == null)
-                yield break;
-
-            if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
-            {
-                UpdateProfileStatus();
-                break;
-            }
+            if (m_ProfileStatusText == null) yield break;
 
             UpdateProfileStatus();
+
+            if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
+                break;
+
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
 
+        // Final authoritative update once auth is settled.
         UpdateProfileStatus();
-        _waitForAuthCoroutine = null;
+        _refreshCoroutine = null;
     }
+
+    // ── Status display ────────────────────────────────────────────────────────
+
+    private void UpdateProfileStatus()
+    {
+        ResolveProfileText();
+        if (m_ProfileStatusText == null) return;
+
+        bool signedIn = IsSignedInStable();
+
+        const string kColorOpen  = "<color=#FFEE00>";
+        const string kColorClose = "</color>";
+
+        m_ProfileStatusText.text = signedIn
+            ? $"{kColorOpen}Your journey is safe.{kColorClose}"
+            : $"{kColorOpen}Log in to save your journey.{kColorClose}";
+    }
+
+    /// <summary>
+    /// Returns true if we can confidently say the player is signed in.
+    /// Checks live state first; falls back to the PrefPlayerSignedIn flag
+    /// written by Scene2AuthUI after a successful cloud load.
+    ///
+    /// Note: does NOT fall back to PrefLoginMode because that key is deleted
+    /// on every scene transition and is therefore unreliable as a status flag.
+    /// </summary>
+    private bool IsSignedInStable()
+    {
+        // 1. Live AuthManager state (most authoritative).
+        if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
+            return AuthManager.Instance.IsSignedIn;
+
+        // 2. Raw service state (AuthManager not ready yet).
+        if (UnityServices.State == ServicesInitializationState.Initialized &&
+            AuthenticationService.Instance != null &&
+            AuthenticationService.Instance.IsSignedIn)
+            return true;
+
+        // 3. Persisted flag written after a confirmed cloud session.
+        return PlayerPrefs.GetInt(AuthManager.PrefPlayerSignedIn, 0) == 1;
+    }
+
+    // ── Subscriptions ─────────────────────────────────────────────────────────
 
     private void TrySubscribeAuthEvents()
     {
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (AuthenticationService.Instance == null) return;
 
-        AuthenticationService.Instance.SignedIn -= OnAuthChanged;
-        AuthenticationService.Instance.SignedIn += OnAuthChanged;
+        // Remove before adding to guarantee no duplicate subscriptions.
+        AuthenticationService.Instance.SignedIn  -= OnAuthChanged;
+        AuthenticationService.Instance.SignedIn  += OnAuthChanged;
         AuthenticationService.Instance.SignedOut -= OnAuthChanged;
         AuthenticationService.Instance.SignedOut += OnAuthChanged;
-        AuthenticationService.Instance.Expired -= OnAuthChanged;
-        AuthenticationService.Instance.Expired += OnAuthChanged;
+        AuthenticationService.Instance.Expired   -= OnAuthChanged;
+        AuthenticationService.Instance.Expired   += OnAuthChanged;
     }
 
     private void UnsubscribeAuthEvents()
     {
+        if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (AuthenticationService.Instance == null) return;
 
-        AuthenticationService.Instance.SignedIn -= OnAuthChanged;
+        AuthenticationService.Instance.SignedIn  -= OnAuthChanged;
         AuthenticationService.Instance.SignedOut -= OnAuthChanged;
-        AuthenticationService.Instance.Expired -= OnAuthChanged;
+        AuthenticationService.Instance.Expired   -= OnAuthChanged;
     }
 
     private void TrySubscribeAuthManager()
     {
         if (AuthManager.Instance == null) return;
-
         AuthManager.Instance.OnStateChanged -= OnAuthChanged;
         AuthManager.Instance.OnStateChanged += OnAuthChanged;
     }
@@ -156,63 +201,29 @@ public class PlayerProfileStatus : MonoBehaviour
         AuthManager.Instance.OnStateChanged -= OnAuthChanged;
     }
 
-    private void UpdateProfileStatus()
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void StopRefreshCoroutine()
     {
-        ResolveProfileText();
-
-        if (m_ProfileStatusText == null) return;
-
-        bool signedIn = IsSignedInStable();
-
-        const string colorOpen = "<color=#FFEE00>";
-        const string colorClose = "</color>";
-
-        var sb2 = new StringBuilder();
-        sb2.AppendLine(signedIn
-            ? $"{colorOpen}Your journey is safe.{colorClose}"
-            : $"{colorOpen}Log in to save your journey.{colorClose}");
-
-        m_ProfileStatusText.text = sb2.ToString();
+        if (_refreshCoroutine == null) return;
+        StopCoroutine(_refreshCoroutine);
+        _refreshCoroutine = null;
     }
 
-    private bool IsSignedInStable()
-    {
-        bool liveSignedIn = false;
-
-        if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
-            liveSignedIn = AuthManager.Instance.IsSignedIn;
-        else if (AuthenticationService.Instance != null)
-            liveSignedIn = AuthenticationService.Instance.IsSignedIn;
-
-        if (liveSignedIn)
-            return true;
-
-        if (PlayerPrefs.GetInt("PlayerSignedIn", 0) == 1)
-            return true;
-
-        return PlayerPrefs.GetString(AuthManager.PrefLoginMode, "") == "Unity";
-    }
-
+    /// <summary>
+    /// Tries to find a TMP_Text target in priority order:
+    /// serialized field → this component → children → parent.
+    /// </summary>
     private void ResolveProfileText()
     {
-        if (m_ProfileStatusText != null)
-            return;
+        if (m_ProfileStatusText != null) return;
 
         m_ProfileStatusText = GetComponent<TMP_Text>();
-        if (m_ProfileStatusText != null)
-            return;
+        if (m_ProfileStatusText != null) return;
 
-        m_ProfileStatusText = GetComponentInChildren<TMP_Text>(true);
-        if (m_ProfileStatusText != null)
-            return;
+        m_ProfileStatusText = GetComponentInChildren<TMP_Text>(includeInactive: true);
+        if (m_ProfileStatusText != null) return;
 
-        m_ProfileStatusText = GetComponentInParent<TMP_Text>(true);
-    }
-
-    private void OnDestroy()
-    {
-        UnsubscribeAuthEvents();
-        UnsubscribeAuthManager();
-        SceneManager.sceneLoaded -= OnSceneLoaded;
+        m_ProfileStatusText = GetComponentInParent<TMP_Text>(includeInactive: true);
     }
 }

@@ -12,6 +12,12 @@ EditorBuildSettings:
     path: Assets/Scenes/v2/UI/Archive/LogIn Screen.unity
     guid: eaf5880c363990242808a8cd551716de
   - enabled: 1
+    path: Assets/Scenes/v2/UI/Log In.unity
+    guid: e917088fb7d8296468d9f557e5896198
+  - enabled: 1
+    path: Assets/Scenes/v2/UI/Entry Screen 1.unity
+    guid: 18b7c232a7b2e5c4bb149f4272e1ee11
+  - enabled: 0
     path: Assets/Scenes/v2/UI/LogIn Screen 1.unity
     guid: a3b83296087ded24f86949547d1d9578
   - enabled: 1

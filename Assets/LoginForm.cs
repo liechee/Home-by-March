@@ -243,6 +243,7 @@ public class LoginForm : MonoBehaviour
     {
         string playerName = AuthenticationService.Instance.PlayerName;
         string playerId = AuthenticationService.Instance.PlayerId;
+        string username = usernameInputField.text.Trim();
         
         ShowStatusMessage($"Welcome, {playerName}!", false);
         ShowWelcomeMessage($"Successfully signed in as {playerName}");
@@ -253,6 +254,11 @@ public class LoginForm : MonoBehaviour
         PlayerPrefs.SetString("LastSignedInPlayerId", playerId);
         PlayerPrefs.SetString("LastLoginMethod", "Account");
         PlayerPrefs.Save();
+
+        // Update PlayerData so UI listeners refresh (e.g., UserLevel)
+        var pd = FindObjectOfType<PlayerData>();
+        if (pd != null)
+            pd.ChangePlayerName(username);
         
         StartCoroutine(ProceedAfterLogin());
     }
@@ -362,6 +368,11 @@ public class LoginForm : MonoBehaviour
         PlayerPrefs.SetString("LastGuestUsername", guestName);
         PlayerPrefs.SetString("LastLoginMethod", "Guest");
         PlayerPrefs.Save();
+
+        // Update PlayerData so UI listeners refresh (e.g., UserLevel)
+        var pd = FindObjectOfType<PlayerData>();
+        if (pd != null)
+            pd.ChangePlayerName(guestName);
         
         StartCoroutine(LoadMainScreenWithGuest(guestName));
     }
@@ -423,6 +434,10 @@ public class LoginForm : MonoBehaviour
                 guestUsernameText.text = $"Guest: {currentGuestUsername}";
             }
             ShowStatusMessage($"Guest username updated to: {currentGuestUsername}", false);
+            // Update PlayerData so UI updates immediately
+            var pd = FindObjectOfType<PlayerData>();
+            if (pd != null)
+                pd.ChangePlayerName(currentGuestUsername);
             
             if (updateGuestUsernameButton != null)
                 updateGuestUsernameButton.interactable = false;

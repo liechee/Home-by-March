@@ -26,7 +26,7 @@ public class OneTimeSceneAccess : MonoBehaviour
         else
         {
             // Player data doesn't exist, change scene to LogIn
-            SceneManager.LoadScene("LogIn Screen 1");
+            SceneManager.LoadScene("Log In");
             Debug.Log("[OneTimeSceneAccess] PlayerData does not exists");
         }
     }

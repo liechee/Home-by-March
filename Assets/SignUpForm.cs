@@ -20,15 +20,19 @@ public class SignUpForm : MonoBehaviour
     
     [Header("Password Visibility")]
     [SerializeField] private Button showPasswordButton;
+    [SerializeField] private Button showConfirmPasswordButton;
     [SerializeField] private Sprite eyeOpenSprite;
     [SerializeField] private Sprite eyeClosedSprite;
     [SerializeField] private Image passwordEyeIcon;
+    [SerializeField] private Image confirmPasswordEyeIcon;
     
     [Header("Scene Loading")]
     [SerializeField] private string loginScreenSceneName = "LoginScreen";
+    [SerializeField] private string mainScreenSceneName = "MainScreen";
     
     private bool isProcessing = false;
     private bool isPasswordVisible = false;
+    private bool isConfirmPasswordVisible = false;
     private bool isInitialized = false;
     
     private void Awake()
@@ -42,6 +46,11 @@ public class SignUpForm : MonoBehaviour
         if (showPasswordButton != null)
         {
             showPasswordButton.onClick.AddListener(TogglePasswordVisibility);
+        }
+
+        if (showConfirmPasswordButton != null)
+        {
+            showConfirmPasswordButton.onClick.AddListener(ToggleConfirmPasswordVisibility);
         }
         
         if (passwordInputField != null)
@@ -70,13 +79,20 @@ public class SignUpForm : MonoBehaviour
             passwordInputField.ForceLabelUpdate();
         }
         
+        UpdateEyeIcon();
+    }
+
+    private void ToggleConfirmPasswordVisibility()
+    {
+        isConfirmPasswordVisible = !isConfirmPasswordVisible;
+
         if (confirmPasswordInputField != null)
         {
-            confirmPasswordInputField.contentType = isPasswordVisible ? 
+            confirmPasswordInputField.contentType = isConfirmPasswordVisible ? 
                 TMP_InputField.ContentType.Standard : TMP_InputField.ContentType.Password;
             confirmPasswordInputField.ForceLabelUpdate();
         }
-        
+
         UpdateEyeIcon();
     }
     
@@ -88,6 +104,14 @@ public class SignUpForm : MonoBehaviour
                 passwordEyeIcon.sprite = eyeOpenSprite;
             else if (!isPasswordVisible && eyeClosedSprite != null)
                 passwordEyeIcon.sprite = eyeClosedSprite;
+        }
+        
+        if (confirmPasswordEyeIcon != null)
+        {
+            if (isConfirmPasswordVisible && eyeOpenSprite != null)
+                confirmPasswordEyeIcon.sprite = eyeOpenSprite;
+            else if (!isConfirmPasswordVisible && eyeClosedSprite != null)
+                confirmPasswordEyeIcon.sprite = eyeClosedSprite;
         }
     }
     
@@ -236,16 +260,31 @@ public class SignUpForm : MonoBehaviour
             
             // Show success message
             ShowStatusMessage("Account created successfully!", false);
+
+            // Make sure the new account is signed in before leaving this screen.
+            if (!AuthenticationService.Instance.IsSignedIn)
+            {
+                Debug.Log("Signing in newly created user automatically");
+                await AuthenticationService.Instance.SignInWithUsernamePasswordAsync(username, password);
+            }
             
             // Store the username for next time
             PlayerPrefs.SetString("LastSignedInUser", username);
+            PlayerPrefs.SetString("LastSignedInPlayer", AuthenticationService.Instance.PlayerName);
+            PlayerPrefs.SetString("LastSignedInPlayerId", AuthenticationService.Instance.PlayerId);
+            PlayerPrefs.SetString("LastLoginMethod", "Account");
             PlayerPrefs.Save();
+
+            // Update PlayerData so UI listeners refresh with the new name
+            var pd = FindObjectOfType<PlayerData>();
+            if (pd != null)
+                pd.ChangePlayerName(username);
             
             // Wait a moment to show success message
             await Task.Delay(1500);
             
-            // Return to login screen
-            OnBackToLoginClicked();
+            // Continue into the game with the authenticated session.
+            StartCoroutine(LoadMainScreen());
         }
         catch (AuthenticationException ex)
         {
@@ -260,6 +299,53 @@ public class SignUpForm : MonoBehaviour
             isProcessing = false;
             SetUIInteractable(true);
         }
+    }
+
+    private IEnumerator LoadMainScreen()
+    {
+        ShowStatusMessage("Loading game...", false);
+
+        if (!string.IsNullOrEmpty(mainScreenSceneName))
+        {
+            yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
+        }
+
+        isProcessing = false;
+    }
+
+    private IEnumerator LoadSceneAsync(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName))
+        {
+            Debug.LogError("Scene name is empty!");
+            yield break;
+        }
+
+        if (!IsSceneValid(sceneName))
+        {
+            Debug.LogError($"Scene '{sceneName}' not found in build settings!");
+            yield break;
+        }
+
+        AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
+
+        while (!asyncLoad.isDone)
+        {
+            yield return null;
+        }
+    }
+
+    private bool IsSceneValid(string sceneName)
+    {
+        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings; i++)
+        {
+            string scenePath = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
+            string sceneNameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(scenePath);
+            if (sceneNameWithoutExtension == sceneName)
+                return true;
+        }
+
+        return false;
     }
     
     private void HandleAuthenticationError(AuthenticationException ex)
@@ -377,6 +463,7 @@ public class SignUpForm : MonoBehaviour
         if (signUpButton != null) signUpButton.interactable = interactable;
         if (backToLoginButton != null) backToLoginButton.interactable = interactable;
         if (showPasswordButton != null) showPasswordButton.interactable = interactable;
+        if (showConfirmPasswordButton != null) showConfirmPasswordButton.interactable = interactable;
         if (usernameInputField != null) usernameInputField.interactable = interactable;
         if (passwordInputField != null) passwordInputField.interactable = interactable;
         if (confirmPasswordInputField != null) confirmPasswordInputField.interactable = interactable;

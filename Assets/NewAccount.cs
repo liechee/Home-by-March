@@ -37,7 +37,7 @@ public class AccessTokenChecker : MonoBehaviour
             PlayerPrefs.SetInt(loginKeyForCurrentToken, 1);
             PlayerPrefs.Save();
 
-            SceneManager.LoadScene("LogIn Screen");
+            SceneManager.LoadScene("Log In");
         }
         else
         {

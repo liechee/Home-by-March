@@ -11346,6 +11346,18 @@ MonoBehaviour:
   currentCooldown: 0
   currentMovementSpeed: 0
   lastSavedLevel: 0
+  data:
+    playerName: 
+    health: 0
+    saveData: 0
+    level: 0
+    lastSavedLevel: 0
+    attack: 0
+    defense: 0
+    cooldown: 0
+    movementSpeed: 0
+    gold: 0
+    attackSpeed: 0
   playerAttributes: {fileID: 0}
   isLoggingOut: 0
 --- !u!114 &1953494815
@@ -11781,10 +11793,13 @@ MonoBehaviour:
   signUpButton: {fileID: 1665842366}
   backToLoginButton: {fileID: 0}
   showPasswordButton: {fileID: 0}
+  showConfirmPasswordButton: {fileID: 0}
   eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   passwordEyeIcon: {fileID: 0}
+  confirmPasswordEyeIcon: {fileID: 0}
   loginScreenSceneName: Login Screen
+  mainScreenSceneName: MainScreen
 --- !u!114 &2086810735
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11802,6 +11817,7 @@ MonoBehaviour:
   addRandomWord: 1
   numberMin: 100
   numberMax: 9999
+  playerData: {fileID: 0}
   adjectives:
   - Brave
   - Swift
@@ -12452,5 +12468,5 @@ SceneRoots:
   m_Roots:
   - {fileID: 622604858}
   - {fileID: 2086810733}
-  - {fileID: 1953494811}
   - {fileID: 1759641355}
+  - {fileID: 1953494811}

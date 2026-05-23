@@ -1,576 +1,427 @@
+using System.Collections;
+using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
-using TMPro;
-using Unity.Services.Core;
-using Unity.Services.Authentication;
-using System.Threading.Tasks;
 
+/// <summary>
+/// Scene 1 login UI — username/password provider.
+///
+/// Responsibilities:
+///   - Reflect auth state via AuthManager.OnStateChanged.
+///   - Handle username/password sign-in through AuthManager.
+///   - Handle guest login (creates anonymous Unity session via AuthManager).
+///   - Navigate to sign-up scene or main scene.
+///
+/// This script owns NO auth logic — everything goes through AuthManager.
+/// Guest account upgrade is handled exclusively by AccountHubUI in Scene 2.
+/// </summary>
 public class LoginForm : MonoBehaviour
 {
-    [Header("UI References")]
-    [SerializeField] private TMP_InputField usernameInputField;
-    [SerializeField] private TMP_InputField passwordInputField;
+    // ── Inspector ─────────────────────────────────────────────────────────────
+
+    [Header("Status UI")]
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private TMP_Text welcomeText;
-    [SerializeField] private Button signInButton;
-    [SerializeField] private Button signUpButton;
-    [SerializeField] private Button guestLoginButton;
-    [SerializeField] private Button signOutButton;
-    [SerializeField] private GameObject loginPanel;
-    [SerializeField] private GameObject guestPanel;
-    [SerializeField] private TMP_Text guestUsernameText;
-    
-    [Header("Password Field")]
+
+    [Header("Login Panel")]
+    [SerializeField] private GameObject      loginPanel;
+    [SerializeField] private TMP_InputField  usernameInputField;
+    [SerializeField] private TMP_InputField  passwordInputField;
+    [SerializeField] private Button          signInButton;
+    [SerializeField] private Button          signUpButton;
+
+    [Header("Password Visibility")]
     [SerializeField] private Button showPasswordButton;
     [SerializeField] private Sprite eyeOpenSprite;
     [SerializeField] private Sprite eyeClosedSprite;
-    [SerializeField] private Image eyeIconImage;
-    
-    [Header("Guest Settings")]
+    [SerializeField] private Image  eyeIconImage;
+
+    [Header("Guest Panel")]
+    [SerializeField] private GameObject     guestPanel;
+    [SerializeField] private TMP_Text       guestUsernameText;
     [SerializeField] private TMP_InputField guestUsernameInputField;
-    [SerializeField] private Button generateGuestUsernameButton;
-    [SerializeField] private Button updateGuestUsernameButton;
-    
+    [SerializeField] private Button         guestLoginButton;
+    [SerializeField] private Button         generateGuestUsernameButton;
+    [SerializeField] private Button         updateGuestUsernameButton;
+
     [Header("Scene Loading")]
-    [SerializeField] private string mainScreenSceneName = "MainScreen";
+    [SerializeField] private string mainScreenSceneName    = "MainScreen";
     [SerializeField] private string loadingScreenSceneName = "LoadingScreen";
-    [SerializeField] private string signUpSceneName = "SignUpScene";
-    [SerializeField] private float loadingScreenDuration = 2f;
-    
+    [SerializeField] private string signUpSceneName        = "SignUpScene";
+    [SerializeField] private float  loadingScreenDuration  = 2f;
+
+    // ── Private state ─────────────────────────────────────────────────────────
+
     private GuestUsernameGenerator usernameGenerator;
     private string currentGuestUsername;
-    private bool isInitialized = false;
-    private bool isProcessing = false;
-    private bool isSignedIn = false;
-    private bool useSceneLoading = true;
-    private bool isPasswordVisible = false;
-    
-    private void Awake()
+    private bool   isProcessing;
+    private bool   isPasswordVisible;
+
+    // ── Unity lifecycle ───────────────────────────────────────────────────────
+
+    private void OnEnable()
     {
-        InitializeUnityServices();
-        SetupPasswordToggle();
+        if (AuthManager.Instance != null)
+            AuthManager.Instance.OnStateChanged += OnAuthStateChanged;
     }
-    
+
+    private void OnDisable()
+    {
+        if (AuthManager.Instance != null)
+            AuthManager.Instance.OnStateChanged -= OnAuthStateChanged;
+    }
+
+    private void Start()
+    {
+        SetupPasswordToggle();
+        SetupButtons();
+        SetupGuestGenerator();
+
+        // Hide everything until auth state is known.
+        loginPanel?.SetActive(false);
+        guestPanel?.SetActive(false);
+
+        // Re-subscribe in case OnEnable fired before AuthManager.Awake completed.
+        if (AuthManager.Instance != null)
+        {
+            AuthManager.Instance.OnStateChanged -= OnAuthStateChanged;
+            AuthManager.Instance.OnStateChanged += OnAuthStateChanged;
+        }
+
+        StartCoroutine(WaitForAuthThenRefresh());
+    }
+
+    // ── Auth-ready coroutine ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Polls until AuthManager.IsReady, then fires an initial UI refresh.
+    /// Handles the race between this MonoBehaviour's Start and AuthManager's async init.
+    /// </summary>
+    private IEnumerator WaitForAuthThenRefresh()
+    {
+        const float kTimeout = 10f;
+        float elapsed = 0f;
+
+        while (elapsed < kTimeout)
+        {
+            if (AuthManager.Instance != null && AuthManager.Instance.IsReady) break;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (elapsed >= kTimeout)
+            Debug.LogWarning("[LoginForm] Timed out waiting for AuthManager.IsReady.");
+
+        OnAuthStateChanged();
+    }
+
+    // ── Auth state handler ────────────────────────────────────────────────────
+
+    private void OnAuthStateChanged()
+    {
+        if (AuthManager.Instance == null) return;
+
+        if (AuthManager.Instance.IsSignedIn)
+        {
+            // Session was restored — skip login form and go straight to game.
+            string name = AuthManager.Instance.CloudUsername
+                          ?? PlayerPrefs.GetString("LastSignedInPlayer", "Player");
+
+            ShowWelcomeMessage($"Welcome back, {name}!");
+            loginPanel?.SetActive(false);
+            guestPanel?.SetActive(false);
+
+            if (!isProcessing)
+                StartCoroutine(LoadMainScreen());
+        }
+        else
+        {
+            // No session — show login and guest panels.
+            loginPanel?.SetActive(true);
+            guestPanel?.SetActive(true);
+            ShowWelcomeMessage("");
+
+            // Restore last guest name if available.
+            if (string.IsNullOrEmpty(currentGuestUsername))
+            {
+                string saved = PlayerPrefs.GetString("LastGuestUsername", "");
+                if (!string.IsNullOrEmpty(saved))
+                {
+                    currentGuestUsername = saved;
+                    if (guestUsernameInputField != null)
+                        guestUsernameInputField.text = saved;
+                    if (guestUsernameText != null)
+                        guestUsernameText.text = $"Guest: {saved}";
+                }
+                else
+                {
+                    GenerateGuestUsername();
+                }
+            }
+        }
+    }
+
+    // ── Setup ─────────────────────────────────────────────────────────────────
+
+    private void SetupButtons()
+    {
+        signInButton?.onClick.AddListener(OnSignInClicked);
+        signUpButton?.onClick.AddListener(OnSignUpClicked);
+        guestLoginButton?.onClick.AddListener(OnGuestLoginClicked);
+        generateGuestUsernameButton?.onClick.AddListener(OnGenerateGuestUsername);
+        updateGuestUsernameButton?.onClick.AddListener(OnUpdateGuestUsername);
+
+        if (guestUsernameInputField != null)
+            guestUsernameInputField.onValueChanged.AddListener(OnGuestUsernameInputChanged);
+    }
+
     private void SetupPasswordToggle()
     {
-        if (showPasswordButton != null)
-        {
-            showPasswordButton.onClick.AddListener(TogglePasswordVisibility);
-        }
-        
+        showPasswordButton?.onClick.AddListener(TogglePasswordVisibility);
+
         if (passwordInputField != null)
         {
             passwordInputField.contentType = TMP_InputField.ContentType.Password;
             passwordInputField.ForceLabelUpdate();
         }
-        
+
         UpdateEyeIcon();
     }
-    
-    private void TogglePasswordVisibility()
-    {
-        isPasswordVisible = !isPasswordVisible;
-        
-        if (passwordInputField != null)
-        {
-            passwordInputField.contentType = isPasswordVisible ? TMP_InputField.ContentType.Standard : TMP_InputField.ContentType.Password;
-            passwordInputField.ForceLabelUpdate();
-        }
-        
-        UpdateEyeIcon();
-    }
-    
-    private void UpdateEyeIcon()
-    {
-        if (eyeIconImage != null)
-        {
-            if (isPasswordVisible && eyeOpenSprite != null)
-                eyeIconImage.sprite = eyeOpenSprite;
-            else if (!isPasswordVisible && eyeClosedSprite != null)
-                eyeIconImage.sprite = eyeClosedSprite;
-        }
-    }
-    
-    private async void InitializeUnityServices()
-    {
-        try
-        {
-            if (UnityServices.State != ServicesInitializationState.Initialized)
-            {
-                await UnityServices.InitializeAsync();
-                Debug.Log("Unity Services initialized successfully");
-            }
-            
-            SetupUI();
-            await CheckExistingSession();
-            isInitialized = true;
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Failed to initialize Unity Services: {e.Message}");
-            ShowStatusMessage("Failed to initialize services. Check internet connection.", true);
-        }
-    }
-    
-    private async Task CheckExistingSession()
-    {
-        if (AuthenticationService.Instance.IsSignedIn)
-        {
-            isSignedIn = true;
-            string playerName = AuthenticationService.Instance.PlayerName;
-            string playerId = AuthenticationService.Instance.PlayerId;
-            
-            ShowWelcomeMessage($"Welcome back, {playerName}!");
-            ShowGuestPanel(false);
-            ShowLoginPanel(false);
-            ShowStatusMessage($"Signed in as: {playerName}", false);
-            
-            PlayerPrefs.SetString("LastSignedInPlayer", playerName);
-            PlayerPrefs.SetString("LastSignedInPlayerId", playerId);
-            PlayerPrefs.Save();
-        }
-        else
-        {
-            ShowLoginPanel(true);
-            ShowGuestPanel(true);
-            
-            if (PlayerPrefs.HasKey("LastGuestUsername"))
-            {
-                currentGuestUsername = PlayerPrefs.GetString("LastGuestUsername");
-                if (guestUsernameInputField != null)
-                    guestUsernameInputField.text = currentGuestUsername;
-            }
-            else
-            {
-                GenerateGuestUsername();
-            }
-        }
-    }
-    
-    private void SetupUI()
+
+    private void SetupGuestGenerator()
     {
         usernameGenerator = FindObjectOfType<GuestUsernameGenerator>();
         if (usernameGenerator == null)
         {
-            GameObject generatorObj = new GameObject("GuestUsernameGenerator");
-            usernameGenerator = generatorObj.AddComponent<GuestUsernameGenerator>();
-        }
-        
-        if (signInButton != null)
-            signInButton.onClick.AddListener(OnSignInClicked);
-        
-        if (signUpButton != null)
-            signUpButton.onClick.AddListener(OnSignUpClicked);
-        
-        if (guestLoginButton != null)
-            guestLoginButton.onClick.AddListener(OnGuestLoginClicked);
-        
-        if (signOutButton != null)
-            signOutButton.onClick.AddListener(OnSignOutClicked);
-        
-        if (generateGuestUsernameButton != null)
-            generateGuestUsernameButton.onClick.AddListener(OnGenerateGuestUsername);
-        
-        if (updateGuestUsernameButton != null)
-            updateGuestUsernameButton.onClick.AddListener(OnUpdateGuestUsername);
-        
-        if (guestUsernameInputField != null)
-        {
-            guestUsernameInputField.onValueChanged.AddListener(OnGuestUsernameChanged);
-        }
-        
-        if (string.IsNullOrEmpty(currentGuestUsername))
-        {
-            GenerateGuestUsername();
-        }
-        else if (guestUsernameInputField != null)
-        {
-            guestUsernameInputField.text = currentGuestUsername;
+            GameObject go = new GameObject("GuestUsernameGenerator");
+            usernameGenerator = go.AddComponent<GuestUsernameGenerator>();
         }
     }
-    
-    #region Sign In Methods
-    
+
+    // ── Sign in ───────────────────────────────────────────────────────────────
+
     private async void OnSignInClicked()
     {
         if (isProcessing) return;
-        
+
         string username = usernameInputField?.text?.Trim();
         string password = passwordInputField?.text;
-        
+
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
-            ShowStatusMessage("Please enter both username and password", true);
+            ShowStatusMessage("Please enter both username and password.", true);
             return;
         }
-        
+
         isProcessing = true;
         SetButtonsInteractable(false);
-        ShowStatusMessage("Signing in...", false);
-        
-        try
+        ShowStatusMessage("Signing in…", false);
+
+        AuthResult result = await AuthManager.Instance.SignInAsync(username, password);
+
+        if (result.IsSuccess)
         {
-            await SignInWithUsernamePassword(username, password);
+            // OnAuthStateChanged fires automatically and loads the main screen.
         }
-        catch (System.Exception e)
+        else
         {
-            ShowStatusMessage($"Sign in failed: {e.Message}", true);
-            Debug.LogError($"Sign in error: {e.Message}");
+            ShowStatusMessage(result.ErrorMessage, true);
             isProcessing = false;
             SetButtonsInteractable(true);
         }
     }
-    
-    private async Task SignInWithUsernamePassword(string username, string password)
-    {
-        try
-        {
-            await AuthenticationService.Instance.SignInWithUsernamePasswordAsync(username, password);
-            HandleSuccessfulSignIn();
-        }
-        catch (AuthenticationException ex)
-        {
-            HandleAuthenticationError(ex);
-        }
-        catch (RequestFailedException ex)
-        {
-            HandleRequestFailedError(ex);
-        }
-    }
-    
-    private void HandleSuccessfulSignIn()
-    {
-        string playerName = AuthenticationService.Instance.PlayerName;
-        string playerId = AuthenticationService.Instance.PlayerId;
-        string username = usernameInputField.text.Trim();
-        
-        ShowStatusMessage($"Welcome, {playerName}!", false);
-        ShowWelcomeMessage($"Successfully signed in as {playerName}");
-        
-        isSignedIn = true;
-        
-        PlayerPrefs.SetString("LastSignedInPlayer", playerName);
-        PlayerPrefs.SetString("LastSignedInPlayerId", playerId);
-        PlayerPrefs.SetString("LastLoginMethod", "Account");
-        PlayerPrefs.Save();
 
-        // Update PlayerData so UI listeners refresh (e.g., UserLevel)
-        var pd = FindObjectOfType<PlayerData>();
-        if (pd != null)
-            pd.ChangePlayerName(username);
-        
-        StartCoroutine(ProceedAfterLogin());
-    }
-    
-    private IEnumerator ProceedAfterLogin()
-    {
-        yield return new WaitForSeconds(1f);
-        StartCoroutine(LoadMainScreen());
-    }
-    
-    private void HandleAuthenticationError(AuthenticationException ex)
-    {
-        switch (ex.ErrorCode)
-        {
-            case 1000:
-            case 1003:
-                ShowStatusMessage("Account not found. Please sign up first.", true);
-                break;
-            case 1001:
-                ShowStatusMessage("Invalid password. Please try again.", true);
-                break;
-            case 1002:
-                ShowStatusMessage("Invalid username format.", true);
-                break;
-            default:
-                ShowStatusMessage($"Authentication failed: {ex.Message}", true);
-                break;
-        }
-        
-        isProcessing = false;
-        SetButtonsInteractable(true);
-    }
-    
-    private void HandleRequestFailedError(RequestFailedException ex)
-    {
-        switch (ex.ErrorCode)
-        {
-            case 401:
-                ShowStatusMessage("Invalid username or password.", true);
-                break;
-            case 403:
-                ShowStatusMessage("Access forbidden.", true);
-                break;
-            case 404:
-                ShowStatusMessage("Service not available.", true);
-                break;
-            default:
-                ShowStatusMessage($"Sign in failed: {ex.Message}", true);
-                break;
-        }
-        
-        isProcessing = false;
-        SetButtonsInteractable(true);
-    }
-    
+    // ── Sign up navigation ────────────────────────────────────────────────────
+
     private void OnSignUpClicked()
     {
         if (!string.IsNullOrEmpty(signUpSceneName))
-        {
             UnityEngine.SceneManagement.SceneManager.LoadScene(signUpSceneName);
-        }
     }
-    
-    private async void OnSignOutClicked()
-    {
-        try
-        {
-            AuthenticationService.Instance.SignOut();
-            isSignedIn = false;
-            
-            ShowLoginPanel(true);
-            ShowGuestPanel(true);
-            ShowWelcomeMessage("");
-            ShowStatusMessage("Signed out successfully", false);
-            
-            if (usernameInputField != null) usernameInputField.text = "";
-            if (passwordInputField != null) passwordInputField.text = "";
-            
-            GenerateGuestUsername();
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Sign out error: {e.Message}");
-            ShowStatusMessage("Failed to sign out", true);
-        }
-    }
-    
-    #endregion
-    
-    #region Guest Methods
-    
-    private void OnGuestLoginClicked()
+
+    // ── Guest login ───────────────────────────────────────────────────────────
+
+    private async void OnGuestLoginClicked()
     {
         if (isProcessing) return;
-        
+
         string guestName = GetCurrentGuestUsername();
         if (string.IsNullOrEmpty(guestName))
         {
-            ShowStatusMessage("Please enter or generate a guest username", true);
+            ShowStatusMessage("Please enter or generate a guest username.", true);
             return;
         }
-        
+
         isProcessing = true;
         SetButtonsInteractable(false);
-        ShowStatusMessage($"Logging in as guest: {guestName}...", false);
-        
-        PlayerPrefs.SetString("LastGuestUsername", guestName);
-        PlayerPrefs.SetString("LastLoginMethod", "Guest");
-        PlayerPrefs.Save();
+        ShowStatusMessage($"Logging in as guest: {guestName}…", false);
 
-        // Update PlayerData so UI listeners refresh (e.g., UserLevel)
-        var pd = FindObjectOfType<PlayerData>();
-        if (pd != null)
-            pd.ChangePlayerName(guestName);
-        
-        StartCoroutine(LoadMainScreenWithGuest(guestName));
-    }
-    
-    private IEnumerator LoadMainScreenWithGuest(string guestName)
-    {
-        yield return new WaitForSeconds(1f);
-        ShowStatusMessage($"Welcome guest: {guestName}!", false);
-        yield return new WaitForSeconds(0.5f);
-        StartCoroutine(LoadMainScreen());
-    }
-    
-    private void GenerateGuestUsername()
-    {
-        if (usernameGenerator != null)
+        // Creates a real anonymous Unity session so guest data can be
+        // upgraded to a full account later in AccountHubUI (Scene 2).
+        AuthResult result = await AuthManager.Instance.SetGuestSessionAsync(guestName);
+
+        if (result.IsSuccess)
+            StartCoroutine(LoadMainScreen());
+        else
         {
-            currentGuestUsername = usernameGenerator.GenerateGuestUsername();
-            if (guestUsernameInputField != null)
-            {
-                guestUsernameInputField.text = currentGuestUsername;
-            }
-            if (guestUsernameText != null)
-            {
-                guestUsernameText.text = $"Guest: {currentGuestUsername}";
-            }
+            ShowStatusMessage(result.ErrorMessage, true);
+            isProcessing = false;
+            SetButtonsInteractable(true);
         }
     }
-    
+
+    // ── Guest username UI ─────────────────────────────────────────────────────
+
+    private void GenerateGuestUsername()
+    {
+        if (usernameGenerator == null) return;
+
+        currentGuestUsername = usernameGenerator.GenerateGuestUsername();
+
+        if (guestUsernameInputField != null)
+            guestUsernameInputField.text = currentGuestUsername;
+
+        if (guestUsernameText != null)
+            guestUsernameText.text = $"Guest: {currentGuestUsername}";
+
+        if (updateGuestUsernameButton != null)
+            updateGuestUsernameButton.interactable = false;
+    }
+
     private void OnGenerateGuestUsername()
     {
         GenerateGuestUsername();
         ShowStatusMessage("New guest username generated!", false);
-        
-        if (updateGuestUsernameButton != null)
-        {
-            updateGuestUsernameButton.interactable = false;
-        }
     }
-    
-    private void OnGuestUsernameChanged(string newText)
+
+    private void OnGuestUsernameInputChanged(string newText)
     {
-        if (!string.IsNullOrEmpty(newText))
-        {
-            bool isDifferent = newText != currentGuestUsername;
-            if (updateGuestUsernameButton != null)
-            {
-                updateGuestUsernameButton.interactable = isDifferent;
-            }
-        }
+        if (updateGuestUsernameButton != null)
+            updateGuestUsernameButton.interactable =
+                !string.IsNullOrEmpty(newText) && newText != currentGuestUsername;
     }
-    
+
     private void OnUpdateGuestUsername()
     {
-        if (guestUsernameInputField != null && !string.IsNullOrEmpty(guestUsernameInputField.text))
-        {
-            currentGuestUsername = guestUsernameInputField.text.Trim();
-            if (guestUsernameText != null)
-            {
-                guestUsernameText.text = $"Guest: {currentGuestUsername}";
-            }
-            ShowStatusMessage($"Guest username updated to: {currentGuestUsername}", false);
-            // Update PlayerData so UI updates immediately
-            var pd = FindObjectOfType<PlayerData>();
-            if (pd != null)
-                pd.ChangePlayerName(currentGuestUsername);
-            
-            if (updateGuestUsernameButton != null)
-                updateGuestUsernameButton.interactable = false;
-        }
+        if (guestUsernameInputField == null || string.IsNullOrEmpty(guestUsernameInputField.text))
+            return;
+
+        currentGuestUsername = guestUsernameInputField.text.Trim();
+
+        if (guestUsernameText != null)
+            guestUsernameText.text = $"Guest: {currentGuestUsername}";
+
+        ShowStatusMessage($"Guest username set to: {currentGuestUsername}", false);
+
+        if (updateGuestUsernameButton != null)
+            updateGuestUsernameButton.interactable = false;
     }
-    
+
     private string GetCurrentGuestUsername()
     {
         if (guestUsernameInputField != null && !string.IsNullOrEmpty(guestUsernameInputField.text))
-        {
             return guestUsernameInputField.text.Trim();
-        }
         return currentGuestUsername;
     }
-    
-    #endregion
-    
-    #region UI Helpers
-    
-    private void ShowLoginPanel(bool show)
+
+    // ── Password toggle ───────────────────────────────────────────────────────
+
+    private void TogglePasswordVisibility()
     {
-        if (loginPanel != null)
-            loginPanel.SetActive(show);
-    }
-    
-    private void ShowGuestPanel(bool show)
-    {
-        if (guestPanel != null)
-            guestPanel.SetActive(show);
-    }
-    
-    private void ShowWelcomeMessage(string message)
-    {
-        if (welcomeText != null)
+        isPasswordVisible = !isPasswordVisible;
+
+        if (passwordInputField != null)
         {
-            welcomeText.text = message;
-            welcomeText.gameObject.SetActive(!string.IsNullOrEmpty(message));
+            passwordInputField.contentType = isPasswordVisible
+                ? TMP_InputField.ContentType.Standard
+                : TMP_InputField.ContentType.Password;
+            passwordInputField.ForceLabelUpdate();
         }
+
+        UpdateEyeIcon();
     }
-    
-    private void ShowStatusMessage(string message, bool isError)
+
+    private void UpdateEyeIcon()
     {
-        if (statusText != null)
-        {
-            statusText.text = message;
-            statusText.color = isError ? Color.red : Color.green;
-            
-            if (!string.IsNullOrEmpty(message))
-            {
-                StartCoroutine(ClearStatusAfterDelay(5f));
-            }
-        }
-        
-        Debug.Log($"{(isError ? "Error" : "Info")}: {message}");
+        if (eyeIconImage == null) return;
+        if (isPasswordVisible  && eyeOpenSprite  != null) eyeIconImage.sprite = eyeOpenSprite;
+        if (!isPasswordVisible && eyeClosedSprite != null) eyeIconImage.sprite = eyeClosedSprite;
     }
-    
-    private IEnumerator ClearStatusAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        if (statusText != null && statusText.text != null && !string.IsNullOrEmpty(statusText.text))
-        {
-            if (!statusText.text.Contains("Welcome") && 
-                !statusText.text.Contains("Signed in"))
-            {
-                statusText.text = "";
-            }
-        }
-    }
-    
-    private void SetButtonsInteractable(bool interactable)
-    {
-        if (signInButton != null) signInButton.interactable = interactable;
-        if (signUpButton != null) signUpButton.interactable = interactable;
-        if (guestLoginButton != null) guestLoginButton.interactable = interactable;
-        if (generateGuestUsernameButton != null) generateGuestUsernameButton.interactable = interactable;
-        if (updateGuestUsernameButton != null) updateGuestUsernameButton.interactable = interactable;
-        if (signOutButton != null) signOutButton.interactable = interactable;
-        if (showPasswordButton != null) showPasswordButton.interactable = interactable;
-    }
-    
+
+    // ── Scene loading ─────────────────────────────────────────────────────────
+
     private IEnumerator LoadMainScreen()
     {
-        ShowStatusMessage("Loading game...", false);
-        
-        if (!string.IsNullOrEmpty(loadingScreenSceneName) && useSceneLoading)
+        ShowStatusMessage("Loading game…", false);
+
+        if (!string.IsNullOrEmpty(loadingScreenSceneName))
         {
             yield return StartCoroutine(LoadSceneAsync(loadingScreenSceneName));
             yield return new WaitForSeconds(loadingScreenDuration);
         }
-        
+
         yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
-        
         isProcessing = false;
     }
-    
+
     private IEnumerator LoadSceneAsync(string sceneName)
     {
-        if (string.IsNullOrEmpty(sceneName))
+        if (string.IsNullOrEmpty(sceneName)) { Debug.LogError("[LoginForm] Scene name is empty!"); yield break; }
+        if (!IsSceneValid(sceneName))        { Debug.LogError($"[LoginForm] Scene '{sceneName}' not in build settings!"); yield break; }
+
+        AsyncOperation op = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
+        while (!op.isDone)
         {
-            Debug.LogError("Scene name is empty!");
-            yield break;
-        }
-        
-        if (!IsSceneValid(sceneName))
-        {
-            Debug.LogError($"Scene '{sceneName}' not found in build settings!");
-            yield break;
-        }
-        
-        AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
-        
-        while (!asyncLoad.isDone)
-        {
-            float progress = Mathf.Clamp01(asyncLoad.progress / 0.9f);
-            Debug.Log($"Loading progress: {progress * 100}%");
+            Debug.Log($"[LoginForm] Loading '{sceneName}': {Mathf.Clamp01(op.progress / 0.9f) * 100:0}%");
             yield return null;
         }
     }
-    
-    private bool IsSceneValid(string sceneName)
+
+    private static bool IsSceneValid(string sceneName)
     {
-        int sceneCount = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
-        for (int i = 0; i < sceneCount; i++)
+        int count = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
+        for (int i = 0; i < count; i++)
         {
-            string scenePath = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
-            string sceneNameFromPath = System.IO.Path.GetFileNameWithoutExtension(scenePath);
-            if (sceneNameFromPath == sceneName)
-            {
+            string path = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
+            if (System.IO.Path.GetFileNameWithoutExtension(path) == sceneName)
                 return true;
-            }
         }
         return false;
     }
-    
-    #endregion
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+
+    private void ShowWelcomeMessage(string message)
+    {
+        if (welcomeText == null) return;
+        welcomeText.text = message;
+        welcomeText.gameObject.SetActive(!string.IsNullOrEmpty(message));
+    }
+
+    private void ShowStatusMessage(string message, bool isError)
+    {
+        if (statusText == null) return;
+        statusText.text  = message;
+        statusText.color = isError ? Color.red : Color.green;
+
+        if (!string.IsNullOrEmpty(message))
+            StartCoroutine(ClearStatusAfterDelay(5f));
+    }
+
+    private IEnumerator ClearStatusAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (statusText != null) statusText.text = "";
+    }
+
+    private void SetButtonsInteractable(bool interactable)
+    {
+        if (signInButton              != null) signInButton.interactable              = interactable;
+        if (signUpButton              != null) signUpButton.interactable              = interactable;
+        if (guestLoginButton          != null) guestLoginButton.interactable          = interactable;
+        if (showPasswordButton        != null) showPasswordButton.interactable        = interactable;
+        if (generateGuestUsernameButton != null) generateGuestUsernameButton.interactable = interactable;
+        if (updateGuestUsernameButton   != null) updateGuestUsernameButton.interactable   = interactable;
+    }
 }

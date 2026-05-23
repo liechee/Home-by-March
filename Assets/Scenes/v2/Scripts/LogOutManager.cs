@@ -52,7 +52,7 @@ public class LogOutManager : MonoBehaviour
 
         // 4. Write the logout flag AFTER PlayerPrefs.DeleteAll() so it is the
         //    only key present. Scene1LoginUI reads this to skip auto-resume.
-        PlayerPrefs.SetInt(AuthManager.PrefHasLoggedOut, 1);
+        PlayerPrefs.SetInt(AuthManager1.PrefHasLoggedOut, 1);
         PlayerPrefs.Save();
         Debug.Log("[LogOut] Logout flag written.");
 

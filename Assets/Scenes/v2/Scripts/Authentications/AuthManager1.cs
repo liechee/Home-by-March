@@ -16,11 +16,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
     ///   AuthManager.Awake  →  InitAsync  →  RestoreSessionAsync reads PrefLoginMode
     ///   Scene2AuthUI  →  waits for IsReady, then subscribes to OnStateChanged
     /// </summary>
-    public class AuthManager : MonoBehaviour
+    public class AuthManager1 : MonoBehaviour
     {
         // ── Singleton ─────────────────────────────────────────────────────────────
 
-        public static AuthManager Instance { get; private set; }
+        public static AuthManager1 Instance { get; private set; }
 
         // ── PlayerPrefs keys (shared across scripts) ──────────────────────────────
 

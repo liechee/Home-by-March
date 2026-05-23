@@ -1052,17 +1052,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 275915811}
   m_CullTransparentMesh: 1
---- !u!114 &402447673 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 908342037624863412, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &457904764
 GameObject:
   m_ObjectHideFlags: 0
@@ -5225,6 +5214,17 @@ MonoBehaviour:
   m_Spacing: {x: 0, y: 55}
   m_Constraint: 0
   m_ConstraintCount: 2
+--- !u!114 &1694213818 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 953388245882781426, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
+  m_PrefabInstance: {fileID: 209027551864307723}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1696618265
 GameObject:
   m_ObjectHideFlags: 0
@@ -6927,6 +6927,7 @@ GameObject:
   - component: {fileID: 2086810732}
   - component: {fileID: 2086810734}
   - component: {fileID: 2086810735}
+  - component: {fileID: 2086810736}
   m_Layer: 0
   m_Name: Authentication
   m_TagString: Untagged
@@ -6971,24 +6972,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf625b20b62c0944489bd9eee606ec1c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  usernameInputField: {fileID: 1956305579}
-  passwordInputField: {fileID: 837871745}
   statusText: {fileID: 831659739}
   welcomeText: {fileID: 0}
+  loginPanel: {fileID: 473222660}
+  usernameInputField: {fileID: 1956305579}
+  passwordInputField: {fileID: 837871745}
   signInButton: {fileID: 1448516586}
   signUpButton: {fileID: 0}
-  guestLoginButton: {fileID: 0}
-  signOutButton: {fileID: 0}
-  loginPanel: {fileID: 0}
-  guestPanel: {fileID: 0}
-  guestUsernameText: {fileID: 0}
   showPasswordButton: {fileID: 628265775}
   eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   eyeIconImage: {fileID: 0}
-  guestUsernameInputField: {fileID: 0}
+  guestPanel: {fileID: 1288287487}
+  guestUsernameText: {fileID: 0}
+  guestUsernameInputField: {fileID: 1455765349}
+  guestLoginButton: {fileID: 88770643}
   generateGuestUsernameButton: {fileID: 0}
-  updateGuestUsernameButton: {fileID: 0}
+  updateGuestUsernameButton: {fileID: 730087670}
   mainScreenSceneName: Main Screen
   loadingScreenSceneName: 
   signUpSceneName: 
@@ -7020,21 +7020,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3c9b3b6e227503419c3968bf1b7f210, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  statusText: {fileID: 1912017192}
   usernameInputField: {fileID: 1807225547}
   passwordInputField: {fileID: 1532975044}
   confirmPasswordInputField: {fileID: 902533916}
-  statusText: {fileID: 1912017192}
-  titleText: {fileID: 0}
   signUpButton: {fileID: 523591308}
-  backToLoginButton: {fileID: 0}
+  backToLoginButton: {fileID: 1694213818}
   showPasswordButton: {fileID: 2055120355}
-  showConfirmPasswordButton: {fileID: 402447673}
   eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   passwordEyeIcon: {fileID: 0}
-  confirmPasswordEyeIcon: {fileID: 0}
   loginScreenSceneName: 
-  mainScreenSceneName: Main Screen
 --- !u!114 &2086810735
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7104,6 +7100,18 @@ MonoBehaviour:
   - Horse
   - Deer
   - Hound
+--- !u!114 &2086810736
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2086810730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52073ce92aa34234abc1dba7950acec1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2092172947
 GameObject:
   m_ObjectHideFlags: 0

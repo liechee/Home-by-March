@@ -17,8 +17,8 @@ public class NameChangePanel : MonoBehaviour
 
     private bool IsAnySignedIn()
     {
-        if (AuthManager.Instance != null)
-            return AuthManager.Instance.IsSignedIn;
+        if (AuthManager1.Instance != null)
+            return AuthManager1.Instance.IsSignedIn;
 
         return Unity.Services.Core.UnityServices.State ==
                    Unity.Services.Core.ServicesInitializationState.Initialized
@@ -38,9 +38,9 @@ public class NameChangePanel : MonoBehaviour
                 : playerData.playerName;
             inputField.interactable = false;
         }
-        else if (AuthManager.Instance != null && AuthManager.Instance.IsGuest)
+        else if (AuthManager1.Instance != null && AuthManager1.Instance.IsGuest)
         {
-            inputField.text = AuthManager.Instance.GuestName;
+            inputField.text = AuthManager1.Instance.GuestName;
             inputField.interactable = true;
         }
         else if (playerData != null)
@@ -69,9 +69,9 @@ public class NameChangePanel : MonoBehaviour
 
         HideValidationPanel();
 
-        if (AuthManager.Instance != null && AuthManager.Instance.IsGuest)
+        if (AuthManager1.Instance != null && AuthManager1.Instance.IsGuest)
         {
-            AuthManager.Instance.SetGuestName(newName);
+            AuthManager1.Instance.SetGuestName(newName);
             Debug.Log($"Guest name changed to: {newName}");
         }
         else if (playerData != null)
@@ -101,12 +101,12 @@ public class NameChangePanel : MonoBehaviour
 
         HideValidationPanel();
 
-        if (AuthManager.Instance != null)
-            AuthManager.Instance.SetGuestName(guestName);
+        if (AuthManager1.Instance != null)
+            AuthManager1.Instance.SetGuestName(guestName);
         else
-            PlayerPrefs.SetString(AuthManager.PrefGuestName, guestName);
+            PlayerPrefs.SetString(AuthManager1.PrefGuestName, guestName);
 
-        PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
+        PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Guest");
         PlayerPrefs.DeleteKey("HasLoggedOut");
         PlayerPrefs.Save();
 

@@ -27,13 +27,13 @@ public class InputFieldGrabber : MonoBehaviour
             return;
 
         // Never overwrite cloud-backed player profile data from this local input helper.
-        if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
+        if (AuthManager1.Instance != null && AuthManager1.Instance.IsSignedIn)
         {
             Debug.LogWarning("[InputFieldGrabber] Ignored name write while signed in.");
             return;
         }
 
-        PlayerPrefs.SetString(AuthManager.PrefGuestName, inputText);
+        PlayerPrefs.SetString(AuthManager1.PrefGuestName, inputText);
         PlayerPrefs.Save();
 
         // Create a guest-only payload to avoid colliding with PlayerData schema.

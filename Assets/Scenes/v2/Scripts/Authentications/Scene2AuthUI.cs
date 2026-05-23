@@ -62,8 +62,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private void OnApplicationFocus(bool hasFocus)
         {
             // Player returned from the Unity Account portal.
-            if (hasFocus && _waitingForPortalReturn && AuthManager.Instance != null)
-                _ = AuthManager.Instance.StartUnitySignInAsync();
+            if (hasFocus && _waitingForPortalReturn && AuthManager1.Instance != null)
+                _ = AuthManager1.Instance.StartUnitySignInAsync();
         }
 
         private void Start()
@@ -191,7 +191,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             SetWaitingText(true);
             m_SignInBtn?.SetActive(false);
 
-            await AuthManager.Instance.StartUnitySignInAsync();
+            await AuthManager1.Instance.StartUnitySignInAsync();
         }
 
         /// <summary>

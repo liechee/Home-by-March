@@ -17,7 +17,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
     ///   - Unity Account flow: open portal → exchange token → write PrefLoginMode="Unity" → load Scene 2.
     ///   - Auto-resume: on launch, restore a prior session and skip straight to Scene 2.
     ///
-    /// This script does NOT persist across scenes. AuthManager (DontDestroyOnLoad) owns
+    /// This script does NOT persist across scenes. AuthManager1 (DontDestroyOnLoad) owns
     /// auth state after Scene 2 loads.
     /// </summary>
     public class Scene1LoginUI : MonoBehaviour
@@ -96,7 +96,7 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         {
             // Respect an explicit logout — never auto-restore until the player
             // actively signs in or plays as a guest again.
-            if (PlayerPrefs.GetInt(AuthManager.PrefHasLoggedOut, 0) == 1)
+            if (PlayerPrefs.GetInt(AuthManager1.PrefHasLoggedOut, 0) == 1)
             {
                 Debug.Log("[Scene1LoginUI] Explicit logout flag set — skipping auto-resume.");
                 return false;
@@ -114,8 +114,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
                     if (AuthenticationService.Instance.IsSignedIn)
                     {
-                        PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
-                        PlayerPrefs.DeleteKey(AuthManager.PrefHasLoggedOut);
+                        PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Unity");
+                        PlayerPrefs.DeleteKey(AuthManager1.PrefHasLoggedOut);
                         PlayerPrefs.Save();
                         // m_SignInPanel?.SetActive(false);
                         m_LoginButtonsPanel?.SetActive(false);
@@ -130,10 +130,10 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             }
 
             // ── Guest session restore ─────────────────────────────────────────────
-            string savedGuest = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+            string savedGuest = PlayerPrefs.GetString(AuthManager1.PrefGuestName, "").Trim();
             if (!string.IsNullOrEmpty(savedGuest))
             {
-                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
+                PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Guest");
                 PlayerPrefs.Save();
                 // m_SignInPanel?.SetActive(false);
                 Debug.Log($"[Scene1LoginUI] Guest '{savedGuest}' restored.");
@@ -159,11 +159,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         private void OnPlayAsGuestClicked()
         {
             // If a guest name is already saved, resume that session.
-            string existingGuest = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+            string existingGuest = PlayerPrefs.GetString(AuthManager1.PrefGuestName, "").Trim();
             if (!string.IsNullOrEmpty(existingGuest))
             {
-                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
-                PlayerPrefs.DeleteKey(AuthManager.PrefHasLoggedOut);
+                PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Guest");
+                PlayerPrefs.DeleteKey(AuthManager1.PrefHasLoggedOut);
                 PlayerPrefs.Save();
                 GoToScene2();
                 return;
@@ -187,9 +187,9 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                     SetStatus("Please enter a name to continue.");
                     return;
                 }
-                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Guest");
-                PlayerPrefs.SetString(AuthManager.PrefGuestName, name);
-                PlayerPrefs.DeleteKey(AuthManager.PrefHasLoggedOut);
+                PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Guest");
+                PlayerPrefs.SetString(AuthManager1.PrefGuestName, name);
+                PlayerPrefs.DeleteKey(AuthManager1.PrefHasLoggedOut);
                 PlayerPrefs.Save();
             }
 
@@ -208,12 +208,12 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
 
             try
             {
-                // Wait for AuthManager to finish any concurrent init/restore so we
+                // Wait for AuthManager1 to finish any concurrent init/restore so we
                 // don't clash with its TrySilentRestoreAsync.
                 const float initTimeout = 5f;
                 float waited = 0f;
-                while (AuthManager.Instance != null &&
-                       (!AuthManager.Instance.IsReady || AuthManager.Instance.IsSigningIn) &&
+                while (AuthManager1.Instance != null &&
+                       (!AuthManager1.Instance.IsReady || AuthManager1.Instance.IsSigningIn) &&
                        waited < initTimeout)
                 {
                     await Task.Yield();
@@ -271,35 +271,35 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                 }
 
                 // ── Concurrency guard ─────────────────────────────────────────────
-                // AuthManager may have spawned a TrySilentRestoreAsync on the same
+                // AuthManager1 may have spawned a TrySilentRestoreAsync on the same
                 // frame (e.g. it was destroyed and recreated by LogOutManager and its
                 // new Awake saw a leftover session token). We wait for it to finish,
                 // then claim the lock ourselves so it won't start a new one.
                 const float lockTimeout = 5f;
                 float waited = 0f;
-                while (AuthManager.Instance != null &&
-                       AuthManager.Instance.IsSigningIn &&
+                while (AuthManager1.Instance != null &&
+                       AuthManager1.Instance.IsSigningIn &&
                        waited < lockTimeout)
                 {
                     await Task.Yield();
                     waited += Time.unscaledDeltaTime;
                 }
 
-                // If AuthManager's silent restore already signed us in, we're done.
+                // If AuthManager1's silent restore already signed us in, we're done.
                 if (AuthenticationService.Instance.IsSignedIn)
                 {
-                    Debug.Log("[Scene1LoginUI] AuthManager already signed in during wait — skipping token exchange.");
-                    PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
-                    PlayerPrefs.DeleteKey(AuthManager.PrefHasLoggedOut);
+                    Debug.Log("[Scene1LoginUI] AuthManager1 already signed in during wait — skipping token exchange.");
+                    PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Unity");
+                    PlayerPrefs.DeleteKey(AuthManager1.PrefHasLoggedOut);
                     PlayerPrefs.Save();
                     ResetSignInState();
                     GoToScene2();
                     return;
                 }
 
-                // Claim the global sign-in slot so AuthManager won't race us.
-                if (AuthManager.Instance != null)
-                    AuthManager.Instance.IsSigningIn = true;
+                // Claim the global sign-in slot so AuthManager1 won't race us.
+                if (AuthManager1.Instance != null)
+                    AuthManager1.Instance.IsSigningIn = true;
 
                 // Clear any stale session before signing in with the fresh token.
                 if (AuthenticationService.Instance.IsSignedIn ||
@@ -357,8 +357,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
                     return;
                 }
 
-                PlayerPrefs.SetString(AuthManager.PrefLoginMode, "Unity");
-                PlayerPrefs.DeleteKey(AuthManager.PrefHasLoggedOut);
+                PlayerPrefs.SetString(AuthManager1.PrefLoginMode, "Unity");
+                PlayerPrefs.DeleteKey(AuthManager1.PrefHasLoggedOut);
                 PlayerPrefs.Save();
 
                 ResetSignInState();
@@ -374,8 +374,8 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
             finally
             {
                 // Always release the global lock, even on failure.
-                if (AuthManager.Instance != null)
-                    AuthManager.Instance.IsSigningIn = false;
+                if (AuthManager1.Instance != null)
+                    AuthManager1.Instance.IsSigningIn = false;
             }
         }
 
@@ -394,11 +394,11 @@ namespace Unity.Services.Authentication.PlayerAccounts.Samples
         /// <summary>Returns true if a resumable session exists (Unity token or saved guest).</summary>
         private bool HasExistingSession()
         {
-            if (PlayerPrefs.GetInt(AuthManager.PrefHasLoggedOut, 0) == 1) return false;
+            if (PlayerPrefs.GetInt(AuthManager1.PrefHasLoggedOut, 0) == 1) return false;
             if (AuthenticationService.Instance.IsSignedIn)                 return true;
             if (AuthenticationService.Instance.SessionTokenExists)          return true;
 
-            string guestName = PlayerPrefs.GetString(AuthManager.PrefGuestName, "").Trim();
+            string guestName = PlayerPrefs.GetString(AuthManager1.PrefGuestName, "").Trim();
             return !string.IsNullOrEmpty(guestName);
         }
 

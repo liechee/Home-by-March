@@ -109,7 +109,7 @@ public class PlayerProfileStatus : MonoBehaviour
 
             UpdateProfileStatus();
 
-            if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
+            if (AuthManager1.Instance != null && AuthManager1.Instance.IsReady)
                 break;
 
             elapsed += Time.unscaledDeltaTime;
@@ -149,8 +149,8 @@ public class PlayerProfileStatus : MonoBehaviour
     private bool IsSignedInStable()
     {
         // 1. Live AuthManager state (most authoritative).
-        if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
-            return AuthManager.Instance.IsSignedIn;
+        if (AuthManager1.Instance != null && AuthManager1.Instance.IsReady)
+            return AuthManager1.Instance.IsSignedIn;
 
         // 2. Raw service state (AuthManager not ready yet).
         if (UnityServices.State == ServicesInitializationState.Initialized &&
@@ -159,7 +159,7 @@ public class PlayerProfileStatus : MonoBehaviour
             return true;
 
         // 3. Persisted flag written after a confirmed cloud session.
-        return PlayerPrefs.GetInt(AuthManager.PrefPlayerSignedIn, 0) == 1;
+        return PlayerPrefs.GetInt(AuthManager1.PrefPlayerSignedIn, 0) == 1;
     }
 
     // ── Subscriptions ─────────────────────────────────────────────────────────
@@ -190,15 +190,15 @@ public class PlayerProfileStatus : MonoBehaviour
 
     private void TrySubscribeAuthManager()
     {
-        if (AuthManager.Instance == null) return;
-        AuthManager.Instance.OnStateChanged -= OnAuthChanged;
-        AuthManager.Instance.OnStateChanged += OnAuthChanged;
+        if (AuthManager1.Instance == null) return;
+        AuthManager1.Instance.OnStateChanged -= OnAuthChanged;
+        AuthManager1.Instance.OnStateChanged += OnAuthChanged;
     }
 
     private void UnsubscribeAuthManager()
     {
-        if (AuthManager.Instance == null) return;
-        AuthManager.Instance.OnStateChanged -= OnAuthChanged;
+        if (AuthManager1.Instance == null) return;
+        AuthManager1.Instance.OnStateChanged -= OnAuthChanged;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -4,18 +4,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Scene 1 login UI — username/password provider.
-///
-/// Responsibilities:
-///   - Reflect auth state via AuthManager.OnStateChanged.
-///   - Handle username/password sign-in through AuthManager.
-///   - Handle guest login (creates anonymous Unity session via AuthManager).
-///   - Navigate to sign-up scene or main scene.
-///
-/// This script owns NO auth logic — everything goes through AuthManager.
-/// Guest account upgrade is handled exclusively by AccountHubUI in Scene 2.
-/// </summary>
 public class LoginForm : MonoBehaviour
 {
     // ── Inspector ─────────────────────────────────────────────────────────────
@@ -25,7 +13,7 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private TMP_Text welcomeText;
 
     [Header("Login Panel")]
-    [SerializeField] private GameObject      loginPanel;
+   // [SerializeField] private GameObject      loginPanel;
     [SerializeField] private TMP_InputField  usernameInputField;
     [SerializeField] private TMP_InputField  passwordInputField;
     [SerializeField] private Button          signInButton;
@@ -36,14 +24,6 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private Sprite eyeOpenSprite;
     [SerializeField] private Sprite eyeClosedSprite;
     [SerializeField] private Image  eyeIconImage;
-
-    [Header("Guest Panel")]
-    [SerializeField] private GameObject     guestPanel;
-    [SerializeField] private TMP_Text       guestUsernameText;
-    [SerializeField] private TMP_InputField guestUsernameInputField;
-    [SerializeField] private Button         guestLoginButton;
-    [SerializeField] private Button         generateGuestUsernameButton;
-    [SerializeField] private Button         updateGuestUsernameButton;
 
     [Header("Scene Loading")]
     [SerializeField] private string mainScreenSceneName    = "MainScreen";
@@ -57,6 +37,8 @@ public class LoginForm : MonoBehaviour
     private string currentGuestUsername;
     private bool   isProcessing;
     private bool   isPasswordVisible;
+    private bool   isLoadingScene;  // Prevent duplicate scene loading
+    private PlayerData playerData;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -74,13 +56,15 @@ public class LoginForm : MonoBehaviour
 
     private void Start()
     {
+        // Find PlayerData reference
+        FindPlayerData();
+        
         SetupPasswordToggle();
         SetupButtons();
-        SetupGuestGenerator();
 
         // Hide everything until auth state is known.
-        loginPanel?.SetActive(false);
-        guestPanel?.SetActive(false);
+       // loginPanel?.SetActive(false);
+        isLoadingScene = false;
 
         // Re-subscribe in case OnEnable fired before AuthManager.Awake completed.
         if (AuthManager.Instance != null)
@@ -90,6 +74,15 @@ public class LoginForm : MonoBehaviour
         }
 
         StartCoroutine(WaitForAuthThenRefresh());
+    }
+
+    private void FindPlayerData()
+    {
+        playerData = FindObjectOfType<PlayerData>();
+        if (playerData == null)
+        {
+            Debug.LogWarning("[LoginForm] PlayerData not found in scene.");
+        }
     }
 
     // ── Auth-ready coroutine ──────────────────────────────────────────────────
@@ -116,6 +109,29 @@ public class LoginForm : MonoBehaviour
         OnAuthStateChanged();
     }
 
+    /// <summary>
+    /// Syncs the player name from login username to PlayerData
+    /// </summary>
+    private void SyncPlayerDataName(string username)
+    {
+        if (playerData != null && !string.IsNullOrEmpty(username))
+        {
+            // Use PlayerData API so it triggers change notifications and saves properly
+            playerData.ChangePlayerName(username);
+            Debug.Log($"[LoginForm] Synced player name to PlayerData: {username}");
+        }
+        else if (playerData == null)
+        {
+            Debug.LogWarning("[LoginForm] Cannot sync player name - PlayerData reference is null.");
+            // Try to find PlayerData again
+            FindPlayerData();
+            if (playerData != null && !string.IsNullOrEmpty(username))
+            {
+                playerData.ChangePlayerName(username);
+            }
+        }
+    }
+
     // ── Auth state handler ────────────────────────────────────────────────────
 
     private void OnAuthStateChanged()
@@ -124,42 +140,41 @@ public class LoginForm : MonoBehaviour
 
         if (AuthManager.Instance.IsSignedIn)
         {
-            // Session was restored — skip login form and go straight to game.
+            // Session was restored or sign-in succeeded
             string name = AuthManager.Instance.CloudUsername
+                          ?? AuthManager.Instance.GuestName
                           ?? PlayerPrefs.GetString("LastSignedInPlayer", "Player");
 
-            ShowWelcomeMessage($"Welcome back, {name}!");
-            loginPanel?.SetActive(false);
-            guestPanel?.SetActive(false);
+            // Sync the name to PlayerData
+            SyncPlayerDataName(name);
 
-            if (!isProcessing)
+            ShowWelcomeMessage($"Welcome back, {name}!");
+           // loginPanel?.SetActive(false);
+
+            // Only load main screen if we're not already loading and not already in main scene
+            if (!isLoadingScene && !IsInMainScene())
+            {
                 StartCoroutine(LoadMainScreen());
+            }
         }
         else
         {
-            // No session — show login and guest panels.
-            loginPanel?.SetActive(true);
-            guestPanel?.SetActive(true);
+            // No session — show login panel
+            //loginPanel?.SetActive(true);
             ShowWelcomeMessage("");
 
-            // Restore last guest name if available.
-            if (string.IsNullOrEmpty(currentGuestUsername))
-            {
-                string saved = PlayerPrefs.GetString("LastGuestUsername", "");
-                if (!string.IsNullOrEmpty(saved))
-                {
-                    currentGuestUsername = saved;
-                    if (guestUsernameInputField != null)
-                        guestUsernameInputField.text = saved;
-                    if (guestUsernameText != null)
-                        guestUsernameText.text = $"Guest: {saved}";
-                }
-                else
-                {
-                    GenerateGuestUsername();
-                }
-            }
+            // Reset processing flag when showing login form
+            isProcessing = false;
+            SetButtonsInteractable(true);
         }
+    }
+
+    // ── Helper to check if already in main scene ──────────────────────────────
+
+    private bool IsInMainScene()
+    {
+        string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        return currentScene == mainScreenSceneName;
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -168,12 +183,6 @@ public class LoginForm : MonoBehaviour
     {
         signInButton?.onClick.AddListener(OnSignInClicked);
         signUpButton?.onClick.AddListener(OnSignUpClicked);
-        guestLoginButton?.onClick.AddListener(OnGuestLoginClicked);
-        generateGuestUsernameButton?.onClick.AddListener(OnGenerateGuestUsername);
-        updateGuestUsernameButton?.onClick.AddListener(OnUpdateGuestUsername);
-
-        if (guestUsernameInputField != null)
-            guestUsernameInputField.onValueChanged.AddListener(OnGuestUsernameInputChanged);
     }
 
     private void SetupPasswordToggle()
@@ -203,7 +212,7 @@ public class LoginForm : MonoBehaviour
 
     private async void OnSignInClicked()
     {
-        if (isProcessing) return;
+        if (isProcessing || isLoadingScene) return;
 
         string username = usernameInputField?.text?.Trim();
         string password = passwordInputField?.text;
@@ -218,11 +227,23 @@ public class LoginForm : MonoBehaviour
         SetButtonsInteractable(false);
         ShowStatusMessage("Signing in…", false);
 
+        // ✅ IMPORTANT: Sign out any existing session before attempting to sign in
+        if (AuthManager.Instance.IsSignedIn)
+        {
+            Debug.Log("[LoginForm] Existing session detected. Signing out before new sign in.");
+            AuthManager.Instance.SignOut();
+            await Task.Delay(100); // Wait a moment for sign out to complete
+        }
+
         AuthResult result = await AuthManager.Instance.SignInAsync(username, password);
 
         if (result.IsSuccess)
         {
-            // OnAuthStateChanged fires automatically and loads the main screen.
+            // Sync the username to PlayerData after successful sign in
+            SyncPlayerDataName(username);
+            
+            ShowStatusMessage("Sign in successful!", false);
+            // OnAuthStateChanged will fire and load the main screen
         }
         else
         {
@@ -236,93 +257,19 @@ public class LoginForm : MonoBehaviour
 
     private void OnSignUpClicked()
     {
+        if (isLoadingScene) return;
+        
+        // Sign out any existing session before going to sign-up
+        if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
+        {
+            Debug.Log("[LoginForm] Signing out existing session before sign-up.");
+            AuthManager.Instance.SignOut();
+        }
+        
         if (!string.IsNullOrEmpty(signUpSceneName))
             UnityEngine.SceneManagement.SceneManager.LoadScene(signUpSceneName);
-    }
-
-    // ── Guest login ───────────────────────────────────────────────────────────
-
-    private async void OnGuestLoginClicked()
-    {
-        if (isProcessing) return;
-
-        string guestName = GetCurrentGuestUsername();
-        if (string.IsNullOrEmpty(guestName))
-        {
-            ShowStatusMessage("Please enter or generate a guest username.", true);
-            return;
-        }
-
-        isProcessing = true;
-        SetButtonsInteractable(false);
-        ShowStatusMessage($"Logging in as guest: {guestName}…", false);
-
-        // Creates a real anonymous Unity session so guest data can be
-        // upgraded to a full account later in AccountHubUI (Scene 2).
-        AuthResult result = await AuthManager.Instance.SetGuestSessionAsync(guestName);
-
-        if (result.IsSuccess)
-            StartCoroutine(LoadMainScreen());
         else
-        {
-            ShowStatusMessage(result.ErrorMessage, true);
-            isProcessing = false;
-            SetButtonsInteractable(true);
-        }
-    }
-
-    // ── Guest username UI ─────────────────────────────────────────────────────
-
-    private void GenerateGuestUsername()
-    {
-        if (usernameGenerator == null) return;
-
-        currentGuestUsername = usernameGenerator.GenerateGuestUsername();
-
-        if (guestUsernameInputField != null)
-            guestUsernameInputField.text = currentGuestUsername;
-
-        if (guestUsernameText != null)
-            guestUsernameText.text = $"Guest: {currentGuestUsername}";
-
-        if (updateGuestUsernameButton != null)
-            updateGuestUsernameButton.interactable = false;
-    }
-
-    private void OnGenerateGuestUsername()
-    {
-        GenerateGuestUsername();
-        ShowStatusMessage("New guest username generated!", false);
-    }
-
-    private void OnGuestUsernameInputChanged(string newText)
-    {
-        if (updateGuestUsernameButton != null)
-            updateGuestUsernameButton.interactable =
-                !string.IsNullOrEmpty(newText) && newText != currentGuestUsername;
-    }
-
-    private void OnUpdateGuestUsername()
-    {
-        if (guestUsernameInputField == null || string.IsNullOrEmpty(guestUsernameInputField.text))
-            return;
-
-        currentGuestUsername = guestUsernameInputField.text.Trim();
-
-        if (guestUsernameText != null)
-            guestUsernameText.text = $"Guest: {currentGuestUsername}";
-
-        ShowStatusMessage($"Guest username set to: {currentGuestUsername}", false);
-
-        if (updateGuestUsernameButton != null)
-            updateGuestUsernameButton.interactable = false;
-    }
-
-    private string GetCurrentGuestUsername()
-    {
-        if (guestUsernameInputField != null && !string.IsNullOrEmpty(guestUsernameInputField.text))
-            return guestUsernameInputField.text.Trim();
-        return currentGuestUsername;
+            Debug.LogError("[LoginForm] Sign-up scene name not set!");
     }
 
     // ── Password toggle ───────────────────────────────────────────────────────
@@ -353,6 +300,9 @@ public class LoginForm : MonoBehaviour
 
     private IEnumerator LoadMainScreen()
     {
+        if (isLoadingScene) yield break;
+        
+        isLoadingScene = true;
         ShowStatusMessage("Loading game…", false);
 
         if (!string.IsNullOrEmpty(loadingScreenSceneName))
@@ -362,13 +312,24 @@ public class LoginForm : MonoBehaviour
         }
 
         yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
+        
         isProcessing = false;
+        isLoadingScene = false;
     }
 
     private IEnumerator LoadSceneAsync(string sceneName)
     {
-        if (string.IsNullOrEmpty(sceneName)) { Debug.LogError("[LoginForm] Scene name is empty!"); yield break; }
-        if (!IsSceneValid(sceneName))        { Debug.LogError($"[LoginForm] Scene '{sceneName}' not in build settings!"); yield break; }
+        if (string.IsNullOrEmpty(sceneName)) 
+        { 
+            Debug.LogError("[LoginForm] Scene name is empty!"); 
+            yield break; 
+        }
+        
+        if (!IsSceneValid(sceneName))        
+        { 
+            Debug.LogError($"[LoginForm] Scene '{sceneName}' not in build settings!"); 
+            yield break; 
+        }
 
         AsyncOperation op = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
         while (!op.isDone)
@@ -412,16 +373,18 @@ public class LoginForm : MonoBehaviour
     private IEnumerator ClearStatusAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (statusText != null) statusText.text = "";
+        if (statusText != null && statusText.text != null)
+        {
+            // Only clear if it's not a welcome message
+            if (!statusText.text.Contains("Welcome"))
+                statusText.text = "";
+        }
     }
 
     private void SetButtonsInteractable(bool interactable)
     {
-        if (signInButton              != null) signInButton.interactable              = interactable;
-        if (signUpButton              != null) signUpButton.interactable              = interactable;
-        if (guestLoginButton          != null) guestLoginButton.interactable          = interactable;
-        if (showPasswordButton        != null) showPasswordButton.interactable        = interactable;
-        if (generateGuestUsernameButton != null) generateGuestUsernameButton.interactable = interactable;
-        if (updateGuestUsernameButton   != null) updateGuestUsernameButton.interactable   = interactable;
+        if (signInButton       != null) signInButton.interactable       = interactable;
+        if (signUpButton       != null) signUpButton.interactable       = interactable;
+        if (showPasswordButton != null) showPasswordButton.interactable = interactable;
     }
 }

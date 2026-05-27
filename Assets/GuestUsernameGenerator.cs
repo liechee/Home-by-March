@@ -78,7 +78,7 @@ public class GuestUsernameGenerator : MonoBehaviour
         } while (usedUsernames.Contains(username));
         
         usedUsernames.Add(username);
-        SyncPlayerDataName(username);
+        // SyncPlayerDataName(username); // Uncomment if you have a PlayerData instance available
         return username;
     }
     
@@ -123,15 +123,6 @@ public class GuestUsernameGenerator : MonoBehaviour
         
         // Join parts with underscores
         return string.Join("_", parts);
-    }
-
-    private void SyncPlayerDataName(string username)
-    {
-        if (playerData != null && !string.IsNullOrEmpty(username))
-        {
-            // Use PlayerData API so it triggers change notifications and saves properly
-            playerData.ChangePlayerName(username);
-        }
     }
     
     /// <summary>
@@ -190,7 +181,7 @@ public class GuestUsernameGenerator : MonoBehaviour
         if (!string.IsNullOrEmpty(username))
         {
             usedUsernames.Add(username);
-            SyncPlayerDataName(username);
+           // SyncPlayerDataName(username);
         }
     }
 }

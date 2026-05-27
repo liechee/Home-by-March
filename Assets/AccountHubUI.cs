@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-
+using UnityEngine.SceneManagement;
 /// <summary>
 /// Scene 2 account UI — username/password provider.
 ///
@@ -271,6 +271,7 @@ public class AccountHubUI : MonoBehaviour
         m_RegisterPanel?.SetActive(false);
         SetWaitingText(false);
         ClearAllInputs();
+        SceneManager.LoadScene("Log In");
         // RefreshUI fires automatically via AuthManager.OnStateChanged.
     }
 

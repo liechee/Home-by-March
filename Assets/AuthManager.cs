@@ -4,9 +4,7 @@ using UnityEngine;
 using Unity.Services.Core;
 using Unity.Services.Authentication;
 using Unity.Services.CloudSave;
-using Unity.Services.CloudSave.Models;
 using System.Collections.Generic;
-using CloudSaveItem = Unity.Services.CloudSave.Models.Item;
 
 /// <summary>
 /// Central authentication hub.
@@ -17,6 +15,7 @@ using CloudSaveItem = Unity.Services.CloudSave.Models.Item;
 ///   - Sign in / sign up with username+password provider.
 ///   - Link a guest account to a username+password account.
 ///   - Save and load player profile to/from Cloud Save.
+///   - Save and load full player game data to/from Cloud Save.
 ///   - Broadcast state changes via OnStateChanged.
 ///
 /// All other scripts (LoginForm, SignUpForm, GuestLoginManager) talk to
@@ -39,11 +38,18 @@ public class AuthManager : MonoBehaviour
     private const string CloudKeyPlayerId = "playerId";
     private const string CloudKeyLoginMethod = "loginMethod";
     private const string CloudKeyCreatedAt = "accountCreatedAt";
+    private const string CloudKeyPlayerData = "playerData";
 
     // ── Events ────────────────────────────────────────────────────────────────
 
     /// <summary>Fired whenever auth state changes (signed in, signed out, guest, etc.).</summary>
     public event Action OnStateChanged;
+
+    /// <summary>Fired when player data is loaded from cloud.</summary>
+    public event Action OnPlayerDataLoaded;
+
+    /// <summary>Fired when player data is saved to cloud.</summary>
+    public event Action OnPlayerDataSaved;
 
     // ── Public state ──────────────────────────────────────────────────────────
 
@@ -54,6 +60,9 @@ public class AuthManager : MonoBehaviour
 
     /// <summary>Cloud-loaded username (null until LoadProfileFromCloud completes).</summary>
     public string CloudUsername { get; private set; }
+
+    /// <summary>Reference to the PlayerData component</summary>
+    public PlayerData CurrentPlayerData { get; private set; }
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -67,7 +76,19 @@ public class AuthManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        // Find PlayerData reference
+        FindPlayerData();
+
         _ = InitializeAsync();
+    }
+
+    private void FindPlayerData()
+    {
+        CurrentPlayerData = FindObjectOfType<PlayerData>();
+        if (CurrentPlayerData == null)
+        {
+            Debug.LogWarning("[AuthManager] PlayerData not found in scene.");
+        }
     }
 
     // ── Initialization ────────────────────────────────────────────────────────
@@ -119,10 +140,13 @@ public class AuthManager : MonoBehaviour
             // exists — it does NOT create a new anonymous account.
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
-            Debug.Log($"[AuthManager] Session restored for player: {AuthenticationService.Instance.PlayerId}");
+            Debug.Log($"[AuthManager] Session restored for player: {GetPlayerId()}");
 
             // Load the cloud profile so CloudUsername is populated.
             await LoadProfileFromCloud();
+            
+            // Load player data to PlayerData component
+            await LoadPlayerDataToPlayerData();
         }
         catch (AuthenticationException ex)
         {
@@ -136,6 +160,42 @@ public class AuthManager : MonoBehaviour
         }
     }
 
+    // ── Player ID Methods ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets the current player ID from Unity Authentication
+    /// </summary>
+    public string GetPlayerId()
+    {
+        if (AuthenticationService.Instance != null && !string.IsNullOrEmpty(AuthenticationService.Instance.PlayerId))
+        {
+            return AuthenticationService.Instance.PlayerId;
+        }
+        
+        // For guest or offline fallback
+        if (IsGuest && !string.IsNullOrEmpty(GuestName))
+        {
+            return $"guest_{GuestName}";
+        }
+        
+        // Fallback to device ID
+        return SystemInfo.deviceUniqueIdentifier;
+    }
+
+    /// <summary>
+    /// Gets the current player name (username or guest name)
+    /// </summary>
+    public string GetCurrentPlayerName()
+    {
+        if (IsSignedIn && !string.IsNullOrEmpty(CloudUsername))
+            return CloudUsername;
+        if (IsGuest && !string.IsNullOrEmpty(GuestName))
+            return GuestName;
+        if (CurrentPlayerData != null && !string.IsNullOrEmpty(CurrentPlayerData.playerName))
+            return CurrentPlayerData.playerName;
+        return "Player";
+    }
+
     // ── Sign in ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -146,9 +206,28 @@ public class AuthManager : MonoBehaviour
     {
         try
         {
+            // Ensure any existing guest session is cleared
+            GuestName = null;
+            
             await AuthenticationService.Instance.SignInWithUsernamePasswordAsync(username, password);
 
-            await SaveProfileToCloud(username, "UsernamePassword");
+            // Load profile from cloud first to get existing data
+            await LoadProfileFromCloud();
+            
+            // If cloud profile doesn't exist, save it
+            if (string.IsNullOrEmpty(CloudUsername))
+            {
+                await SaveProfileToCloud(username, "UsernamePassword");
+            }
+            
+            // Load player data from cloud to PlayerData component
+            await LoadPlayerDataToPlayerData();
+
+            // Update PlayerData name
+            if (CurrentPlayerData != null)
+            {
+                CurrentPlayerData.ChangePlayerName(username);
+            }
 
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
@@ -188,9 +267,20 @@ public class AuthManager : MonoBehaviour
                 await Task.Delay(100);
             }
 
+            // Clear guest data
+            GuestName = null;
+            CloudUsername = null;
+
             await AuthenticationService.Instance.SignUpWithUsernamePasswordAsync(username, password);
 
             await SaveProfileToCloud(username, "UsernamePassword");
+            
+            // Update PlayerData with username
+            if (CurrentPlayerData != null)
+            {
+                CurrentPlayerData.ChangePlayerName(username);
+                await SavePlayerDataToCloud();
+            }
 
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
@@ -218,9 +308,6 @@ public class AuthManager : MonoBehaviour
     /// <summary>
     /// Links the current guest session to a new username+password account,
     /// preserving all cloud data already saved under the guest player ID.
-    ///
-    /// Call this when a guest player taps "Register Account" in-game.
-    /// The caller (LoginForm or SignUpForm) only needs to pass username+password.
     /// </summary>
     public async Task<AuthResult> UpgradeGuestToAccountAsync(string username, string password)
     {
@@ -229,15 +316,26 @@ public class AuthManager : MonoBehaviour
 
         try
         {
+            // Save current PlayerData before upgrade
+            var currentPlayerData = CurrentPlayerData;
+            
             await AuthenticationService.Instance.AddUsernamePasswordAsync(username, password);
 
-            // Overwrite the cloud profile with the new permanent identity.
+            // Overwrite the cloud profile with the new permanent identity
             await SaveProfileToCloud(username, "UsernamePassword");
+            
+            // Preserve player data
+            if (currentPlayerData != null && !string.IsNullOrEmpty(currentPlayerData.playerName))
+            {
+                currentPlayerData.ChangePlayerName(username);
+                await SavePlayerDataToCloud();
+            }
 
             GuestName = null;
 
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
+            PlayerPrefs.DeleteKey("LastGuestUsername");
             PlayerPrefs.Save();
 
             Debug.Log($"[AuthManager] Guest account upgraded to: {username}");
@@ -268,13 +366,27 @@ public class AuthManager : MonoBehaviour
     {
         try
         {
+            // Clear any existing cloud username
+            CloudUsername = null;
+            
             // Create a real anonymous Unity session so the player ID exists
             if (!AuthenticationService.Instance.IsSignedIn)
+            {
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
+            }
 
             GuestName = guestUsername;
+            
+            // Update PlayerData with guest name
+            if (CurrentPlayerData != null)
+            {
+                CurrentPlayerData.ChangePlayerName(guestUsername);
+                await SavePlayerDataToCloud();
+            }
+            
             PlayerPrefs.SetString("LastGuestUsername", guestUsername);
             PlayerPrefs.SetString("LastLoginMethod", "Guest");
+            // Don't set PrefPlayerSignedIn for guests
             PlayerPrefs.Save();
 
             OnStateChanged?.Invoke();
@@ -293,6 +405,12 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public void SignOut()
     {
+        // Save current PlayerData before signing out
+        if (CurrentPlayerData != null)
+        {
+            _ = SavePlayerDataToCloud();
+        }
+        
         GuestName = null;
         CloudUsername = null;
 
@@ -309,11 +427,10 @@ public class AuthManager : MonoBehaviour
         Debug.Log("[AuthManager] Signed out and session token cleared.");
     }
 
-    // ── Cloud Save ────────────────────────────────────────────────────────────
+    // ── Cloud Save - Profile ──────────────────────────────────────────────────
 
     /// <summary>
     /// Saves the player's username and identity metadata to Unity Cloud Save.
-    /// Called automatically after sign-in, sign-up, and guest upgrade.
     /// </summary>
     public async Task SaveProfileToCloud(string username, string loginMethod)
     {
@@ -328,7 +445,7 @@ public class AuthManager : MonoBehaviour
             var data = new Dictionary<string, object>
             {
                 { CloudKeyUsername,    username },
-                { CloudKeyPlayerId,    AuthenticationService.Instance.PlayerId },
+                { CloudKeyPlayerId,    GetPlayerId() },
                 { CloudKeyLoginMethod, loginMethod },
                 { CloudKeyCreatedAt,   DateTime.UtcNow.ToString("o") }
             };
@@ -336,18 +453,16 @@ public class AuthManager : MonoBehaviour
             await CloudSaveService.Instance.Data.Player.SaveAsync(data);
             CloudUsername = username;
 
-            Debug.Log($"[AuthManager] Profile saved to cloud for: {username}");
+            Debug.Log($"[AuthManager] Profile saved to cloud for: {username} (ID: {GetPlayerId()})");
         }
         catch (Exception ex)
         {
-            // Cloud save failure is non-fatal — log and continue.
             Debug.LogWarning($"[AuthManager] Cloud save failed: {ex.Message}");
         }
     }
 
     /// <summary>
     /// Loads the player's profile from Unity Cloud Save.
-    /// Populates CloudUsername so other systems can read it without waiting.
     /// </summary>
     public async Task LoadProfileFromCloud()
     {
@@ -369,22 +484,163 @@ public class AuthManager : MonoBehaviour
 
             var result = await CloudSaveService.Instance.Data.Player.LoadAsync(keys);
 
-            if (result.TryGetValue(CloudKeyUsername, out CloudSaveItem usernameItem))
+            if (result.TryGetValue(CloudKeyUsername, out var usernameItem))
             {
                 CloudUsername = usernameItem.Value.GetAs<string>();
-                Debug.Log($"[AuthManager] Cloud profile loaded — username: {CloudUsername}");
+                Debug.Log($"[AuthManager] Cloud profile loaded — username: {CloudUsername}, ID: {GetPlayerId()}");
+            }
+            else
+            {
+                CloudUsername = null;
+                Debug.Log("[AuthManager] No existing cloud profile found.");
             }
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"[AuthManager] Cloud load failed: {ex.Message}");
+            CloudUsername = null;
+        }
+    }
+
+    // ── Cloud Save - Player Data (Compatible with PlayerData component) ───────
+
+    /// <summary>
+    /// Saves PlayerData to Unity Cloud Save
+    /// </summary>
+    public async Task SavePlayerDataToCloud()
+    {
+        if (CurrentPlayerData == null)
+        {
+            Debug.LogWarning("[AuthManager] Cannot save player data — PlayerData is null.");
+            FindPlayerData();
+            if (CurrentPlayerData == null) return;
+        }
+        
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            Debug.LogWarning("[AuthManager] Cannot save player data — player not signed in.");
+            return;
+        }
+
+        try
+        {
+            // Build save data from PlayerData component
+            var playerSaveData = new PlayerDataSaver
+            {
+                playerName = CurrentPlayerData.playerName,
+                level = CurrentPlayerData.level,
+                health = CurrentPlayerData.health,
+                attack = CurrentPlayerData.attack,
+                defense = CurrentPlayerData.defense,
+                cooldown = CurrentPlayerData.cooldown,
+                movementSpeed = CurrentPlayerData.movementSpeed,
+                gold = CurrentPlayerData.gold,
+                attackSpeed = CurrentPlayerData.attackSpeed
+            };
+
+            var data = new Dictionary<string, object>
+            {
+                { CloudKeyPlayerData, JsonUtility.ToJson(playerSaveData) }
+            };
+
+            await CloudSaveService.Instance.Data.Player.SaveAsync(data);
+            
+            Debug.Log($"[AuthManager] PlayerData saved to cloud for: {CurrentPlayerData.playerName} (Level: {CurrentPlayerData.level}, Gold: {CurrentPlayerData.gold})");
+            OnPlayerDataSaved?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[AuthManager] Failed to save player data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Loads PlayerData from Unity Cloud Save and applies to PlayerData component
+    /// </summary>
+    public async Task LoadPlayerDataToPlayerData()
+    {
+        if (!AuthenticationService.Instance.IsSignedIn)
+        {
+            Debug.LogWarning("[AuthManager] Cannot load player data — player not signed in.");
+            return;
+        }
+
+        if (CurrentPlayerData == null)
+        {
+            Debug.LogWarning("[AuthManager] Cannot load player data — PlayerData component not found.");
+            FindPlayerData();
+            if (CurrentPlayerData == null) return;
+        }
+
+        try
+        {
+            var keys = new HashSet<string> { CloudKeyPlayerData };
+            var result = await CloudSaveService.Instance.Data.Player.LoadAsync(keys);
+
+            if (result.TryGetValue(CloudKeyPlayerData, out var dataItem) && dataItem.Value != null)
+            {
+                string jsonData = dataItem.Value.GetAs<string>();
+                if (!string.IsNullOrEmpty(jsonData))
+                {
+                    var loadedData = JsonUtility.FromJson<PlayerDataSaver>(jsonData);
+                    
+                    if (loadedData != null)
+                    {
+                        // Apply loaded data to PlayerData component
+                        CurrentPlayerData.playerName = loadedData.playerName;
+                        CurrentPlayerData.level = loadedData.level;
+                        CurrentPlayerData.health = loadedData.health;
+                        CurrentPlayerData.attack = loadedData.attack;
+                        CurrentPlayerData.defense = loadedData.defense;
+                        CurrentPlayerData.cooldown = loadedData.cooldown;
+                        CurrentPlayerData.movementSpeed = loadedData.movementSpeed;
+                        CurrentPlayerData.gold = loadedData.gold;
+                        CurrentPlayerData.attackSpeed = loadedData.attackSpeed;
+                        
+                        CurrentPlayerData.UpdateCurrentStats();
+                        CurrentPlayerData.SavePlayerData(); // Save to local file
+                        
+                        Debug.Log($"[AuthManager] PlayerData loaded from cloud for: {CurrentPlayerData.playerName} (Level: {CurrentPlayerData.level})");
+                        OnPlayerDataLoaded?.Invoke();
+                        return;
+                    }
+                }
+            }
+            
+            // No cloud data found, save current PlayerData to cloud
+            Debug.Log("[AuthManager] No existing PlayerData in cloud. Saving current data.");
+            await SavePlayerDataToCloud();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[AuthManager] Failed to load player data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Force sync PlayerData to cloud (call when PlayerData changes)
+    /// </summary>
+    public async Task SyncPlayerDataToCloud()
+    {
+        if (CurrentPlayerData != null && IsSignedIn)
+        {
+            await SavePlayerDataToCloud();
         }
     }
 
     // ── SDK event relays ──────────────────────────────────────────────────────
 
-    private void OnSdkSignedIn() => OnStateChanged?.Invoke();
-    private void OnSdkSignedOut() => OnStateChanged?.Invoke();
+    private void OnSdkSignedIn() 
+    {
+        Debug.Log("[AuthManager] SDK Signed In event received.");
+        OnStateChanged?.Invoke();
+    }
+    
+    private void OnSdkSignedOut() 
+    {
+        Debug.Log("[AuthManager] SDK Signed Out event received.");
+        OnStateChanged?.Invoke();
+    }
 
     private void OnSdkExpired()
     {
@@ -400,13 +656,14 @@ public class AuthManager : MonoBehaviour
         1001 => "Incorrect password. Please try again.",
         1002 => "Invalid username format.",
         1003 => "Account not found. Please sign up first.",
+        10000 => "Session error. Please sign out and try again.",
         _ => $"Sign in failed: {fallback}"
     };
 
     private static string MapSignUpError(int code, string fallback) => code switch
     {
         1000 => "Invalid parameters. Please check your inputs.",
-        1001 => "Password does not meet requirements.",
+        1001 => "Password does not meet requirements (min 6 characters).",
         1002 => "Username already taken. Please choose another.",
         10000 => "A session is already active. Please sign out first.",
         _ => $"Registration failed: {fallback}"

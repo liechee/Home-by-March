@@ -35,6 +35,7 @@ public class GuestLoginManager : MonoBehaviour
     public string CurrentUsername => currentSystemGeneratedUsername;
     public string SavedUsername => savedUsername;
     public bool IsInitialized => isInitialized;
+    private PlayerData playerData;
     
     private void Awake()
     {
@@ -214,6 +215,7 @@ public class GuestLoginManager : MonoBehaviour
         
         // Save the new username
         savedUsername = newUsername;
+        SyncPlayerDataName(savedUsername);
         // Persist for access in other scenes / main menu
         PlayerPrefs.SetString("LastGuestUsername", savedUsername);
         PlayerPrefs.SetString("LastLoginMethod", "Guest");
@@ -249,6 +251,14 @@ public class GuestLoginManager : MonoBehaviour
         
         // Start the loading process
         StartCoroutine(LoadGameSequence());
+    }
+    private void SyncPlayerDataName(string username)
+    {
+        if (playerData != null && !string.IsNullOrEmpty(username))
+        {
+            // Use PlayerData API so it triggers change notifications and saves properly
+            playerData.ChangePlayerName(username);
+        }
     }
     
     /// <summary>

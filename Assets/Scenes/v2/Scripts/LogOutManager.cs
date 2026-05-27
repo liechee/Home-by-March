@@ -22,7 +22,7 @@ public class LogOutManager : MonoBehaviour
     [SerializeField] private GameObject loadingPanel;
 
     [Header("Navigation")]
-    [SerializeField] private string loginSceneName = "Entry Screen 1";
+    [SerializeField] private string loginSceneName = "Log In";
     [SerializeField] private float  reloadDelay    = 1.5f;
 
     // ── Public API ────────────────────────────────────────────────────────────

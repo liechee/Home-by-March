@@ -431,8 +431,10 @@ public class OverallStepCounter : MonoBehaviour
         if (isLoggingOut) return;
         CommitCurrentStateToDisk();
 
-        await CloudSaver.SaveDataToCloud("stepData", stepData);
+        //await CloudSaver.SaveDataToCloud("stepData", stepData);
+        await CloudSaver2.SaveData("stepData", stepData);
         Debug.Log($"[CLOUD SAVE] overall={stepData.overallSteps}, daily={stepData.dailySteps}");
+        
     }
 
 
@@ -470,7 +472,8 @@ public class OverallStepCounter : MonoBehaviour
             if (await Task.WhenAny(waitTask, Task.Delay(5000)) != waitTask)
                 Debug.LogWarning("[CLOUD] appOpenTcs timed out — proceeding without app-open capture.");
 
-            string json = await CloudSaver.LoadDataFromCloud("stepData");
+            //string json2 = await CloudSaver.LoadDataFromCloud("stepData");
+            string json = await CloudSaver2.LoadData("stepData");
             if (IsStale(gen) || isLoggingOut) return;
 
             int preservedBaseline = stepData?.baselineSteps ?? 0;

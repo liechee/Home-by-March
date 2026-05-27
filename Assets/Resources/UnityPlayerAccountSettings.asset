@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: b58a3bc647e70774b8c7225eb3b51e7e, type: 3}
   m_Name: UnityPlayerAccountSettings
-  m_EditorClassIdentifier: Unity.Services.Authentication.PlayerAccounts:Unity.Services.Authentication.PlayerAccounts:UnityPlayerAccountSettings
+  m_EditorClassIdentifier: 
   clientId: 01ce1af6-7ec7-454f-97e2-b5ce3c3ed0bb
   scopeMask: 7
   useCustomDeepLinkUri: 0

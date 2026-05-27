@@ -169,7 +169,8 @@ public class PlayerData : MonoBehaviour
         if (PlayerPrefs.GetInt("PlayerSignedIn", 0) != 1) return;
 
         PlayerDataSaver snapshot = BuildSaveData();
-        await CloudSaver.SaveDataToCloud("playerData", snapshot);
+      //  await CloudSaver.SaveDataToCloud("playerData", snapshot);
+        await CloudSaver2.SaveData("playerData", snapshot); // Optional second cloud save for redundancy
 
         Debug.Log($"[PlayerData] Cloud saved — name='{snapshot.playerName}', level={snapshot.level}");
     }
@@ -178,7 +179,8 @@ public class PlayerData : MonoBehaviour
     {
         try
         {
-            string json = await CloudSaver.LoadDataFromCloud("playerData");
+           // string json2 = await CloudSaver.LoadDataFromCloud("playerData");
+            string json = await CloudSaver2.LoadData("playerData"); // Optional second cloud load for redundancy
 
             if (string.IsNullOrEmpty(json))
             {

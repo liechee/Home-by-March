@@ -38,6 +38,7 @@ public class SignUpForm : MonoBehaviour
 
     [Header("Scene Loading")]
     [SerializeField] private string loginScreenSceneName = "LoginScreen";
+    private PlayerData playerData;
 
     // ── Private state ─────────────────────────────────────────────────────────
 
@@ -103,6 +104,14 @@ public class SignUpForm : MonoBehaviour
 
         SetUIInteractable(true);
     }
+     private void SyncPlayerDataName(string username)
+    {
+        if (playerData != null && !string.IsNullOrEmpty(username))
+        {
+            // Use PlayerData API so it triggers change notifications and saves properly
+            playerData.ChangePlayerName(username);
+        }
+    }
 
     // ── Auth state handler ────────────────────────────────────────────────────
 
@@ -149,6 +158,7 @@ public class SignUpForm : MonoBehaviour
         string username        = usernameInputField?.text?.Trim();
         string password        = passwordInputField?.text;
         string confirmPassword = confirmPasswordInputField?.text;
+        SyncPlayerDataName(username);
 
         if (!ValidateUsername(username)) return;
         if (!ValidatePassword(password)) return;

@@ -70,6 +70,16 @@ public class GuestLoginManager : MonoBehaviour
             GameObject generatorObj = new GameObject("GuestUsernameGenerator");
             usernameGenerator = generatorObj.AddComponent<GuestUsernameGenerator>();
         }
+
+        // Try to locate a live PlayerData so we can sync names properly
+        if (playerData == null)
+        {
+            playerData = FindObjectOfType<PlayerData>();
+            if (playerData == null)
+            {
+                Debug.Log("GuestLoginManager: PlayerData not found in scene. Guest name will fall back to PlayerPrefs/AuthManager.");
+            }
+        }
         
         // Setup UI
         SetupButtons();
@@ -254,10 +264,36 @@ public class GuestLoginManager : MonoBehaviour
     }
     private void SyncPlayerDataName(string username)
     {
-        if (playerData != null && !string.IsNullOrEmpty(username))
+        if (!string.IsNullOrEmpty(username))
         {
-            // Use PlayerData API so it triggers change notifications and saves properly
-            playerData.ChangePlayerName(username);
+            // Prefer updating a live PlayerData component if available
+            if (playerData == null)
+                playerData = FindObjectOfType<PlayerData>();
+
+            if (playerData != null)
+            {
+                playerData.ChangePlayerName(username);
+                return;
+            }
+
+            // If PlayerData isn't available, use the public AuthManager API directly
+            try
+            {
+                if (AuthManager.Instance == null)
+                {
+                    Debug.LogWarning("GuestLoginManager: AuthManager.Instance is null — cannot route guest name to AuthManager.");
+                }
+                else
+                {
+                    Debug.Log($"GuestLoginManager: calling AuthManager.SetGuestSessionAsync (IsReady={AuthManager.Instance.IsReady})");
+                    // Fire-and-forget: let AuthManager handle PlayerData/cloud saving for guest sessions
+                    _ = AuthManager.Instance.SetGuestSessionAsync(username);
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"GuestLoginManager: AuthManager.SetGuestSessionAsync call failed: {e.Message}");
+            }
         }
     }
     
@@ -311,6 +347,9 @@ public class GuestLoginManager : MonoBehaviour
                 usernameDisplayText.text = $"Logging in as: {currentSystemGeneratedUsername}...";
             }
             
+            // Sync with AuthManager so guest session is registered and can be upgraded later
+            SyncPlayerDataName(savedUsername);
+            
             // Disable UI during loading
             SetUIInteractable(false);
             
@@ -346,6 +385,25 @@ public class GuestLoginManager : MonoBehaviour
             
             // You can activate/deactivate GameObjects here instead of loading scenes
             yield return new WaitForSeconds(loadingScreenDuration);
+
+            // When scene-loading is disabled in inspector, attempt to load the main scene anyway
+            Debug.Log("Scene loading is disabled; attempting to load main scene directly after simulated delay...");
+            if (IsSceneValid(mainScreenSceneName))
+            {
+                yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
+            }
+            else
+            {
+                Debug.LogWarning($"Main scene '{mainScreenSceneName}' not found in build settings. Attempting direct load as fallback.");
+                try
+                {
+                    UnityEngine.SceneManagement.SceneManager.LoadScene(mainScreenSceneName);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"Failed to load main scene '{mainScreenSceneName}' as fallback: {ex.Message}");
+                }
+            }
         }
         
         isProcessingLogin = false;
@@ -389,7 +447,7 @@ public class GuestLoginManager : MonoBehaviour
         {
             string scenePath = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
             string sceneNameFromPath = System.IO.Path.GetFileNameWithoutExtension(scenePath);
-            if (sceneNameFromPath == sceneName)
+            if (string.Equals(sceneNameFromPath, sceneName, System.StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

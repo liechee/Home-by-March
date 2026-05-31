@@ -1211,7 +1211,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 458899616}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.70756, y: 0.66239, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1220,7 +1220,7 @@ RectTransform:
   - {fileID: 1776869334}
   - {fileID: 169006819}
   - {fileID: 626280811}
-  m_Father: {fileID: 2092172948}
+  m_Father: {fileID: 1953494811}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -1298,7 +1298,7 @@ MonoBehaviour:
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   eyeIconImage: {fileID: 0}
   mainScreenSceneName: Main Screen
-  loadingScreenSceneName: 
+  loadingScreenSceneName: Loading Screen 1
   signUpSceneName: 
   loadingScreenDuration: 2
 --- !u!1 &509304658
@@ -3587,7 +3587,6 @@ GameObject:
   - component: {fileID: 1288287490}
   - component: {fileID: 1288287489}
   - component: {fileID: 1288287491}
-  - component: {fileID: 1288287493}
   m_Layer: 5
   m_Name: Play as Guest panel
   m_TagString: Untagged
@@ -3677,31 +3676,6 @@ MonoBehaviour:
   inputField: {fileID: 1455765349}
   validationPanel: {fileID: 1645303365}
   validationMessageText: {fileID: 31394007}
---- !u!114 &1288287493
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1288287487}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5455a7ec84a977244bd86088b8cdf1bd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  usernameDisplayText: {fileID: 1455765349}
-  usernameInputField: {fileID: 1455765349}
-  generateNewButton: {fileID: 810157445}
-  loginButton: {fileID: 88770643}
-  updateUsernameButton: {fileID: 730087670}
-  loadingScreenSceneName: 
-  mainScreenSceneName: Main Screen
-  loadingScreenDuration: 5
-  useSceneLoading: 1
-  generateOnAwake: 1
-  generateOnStart: 1
-  enabledButtonColor: {r: 1, g: 1, b: 1, a: 1}
-  disabledButtonColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
 --- !u!1 &1293965004
 GameObject:
   m_ObjectHideFlags: 0
@@ -3950,120 +3924,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1330332358}
   m_CullTransparentMesh: 1
---- !u!1 &1355970986
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1355970990}
-  - component: {fileID: 1355970992}
-  - component: {fileID: 1355970991}
-  m_Layer: 0
-  m_Name: Authentication
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1355970990
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1355970986}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1355970991
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1355970986}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63f2f4cf26e5219479b23a02b2cd9ab1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  prefix: Guest
-  addRandomNumber: 1
-  addRandomWord: 1
-  numberMin: 100
-  numberMax: 9999
-  playerData: {fileID: 1953494813}
-  adjectives:
-  - Brave
-  - Swift
-  - Clever
-  - Mighty
-  - Noble
-  - Wild
-  - Calm
-  - Bold
-  - Bright
-  - Dark
-  - Fierce
-  - Gentle
-  - Happy
-  - Lucky
-  - Quick
-  - Silent
-  nouns:
-  - Wolf
-  - Eagle
-  - Tiger
-  - Dragon
-  - Phoenix
-  - Knight
-  - Wizard
-  - Ranger
-  - Explorer
-  - Voyager
-  - Traveler
-  - Warrior
-  - Hunter
-  - Scout
-  - Mage
-  - Rogue
-  animals:
-  - Lion
-  - Tiger
-  - Bear
-  - Fox
-  - Hawk
-  - Owl
-  - Raven
-  - Falcon
-  - Panther
-  - Leopard
-  - Cheetah
-  - Wolf
-  - Eagle
-  - Horse
-  - Deer
-  - Hound
---- !u!114 &1355970992
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1355970986}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 52073ce92aa34234abc1dba7950acec1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1372783819
 GameObject:
   m_ObjectHideFlags: 0
@@ -6180,6 +6040,111 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1780976331}
   m_CullTransparentMesh: 1
+--- !u!1 &1784502660
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1784502662}
+  - component: {fileID: 1784502661}
+  m_Layer: 5
+  m_Name: Guest Name Gen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1784502661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1784502660}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63f2f4cf26e5219479b23a02b2cd9ab1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  prefix: Guest
+  addRandomNumber: 1
+  addRandomWord: 1
+  numberMin: 100
+  numberMax: 9999
+  playerData: {fileID: 1953494813}
+  adjectives:
+  - Brave
+  - Swift
+  - Clever
+  - Mighty
+  - Noble
+  - Wild
+  - Calm
+  - Bold
+  - Bright
+  - Dark
+  - Fierce
+  - Gentle
+  - Happy
+  - Lucky
+  - Quick
+  - Silent
+  nouns:
+  - Wolf
+  - Eagle
+  - Tiger
+  - Dragon
+  - Phoenix
+  - Knight
+  - Wizard
+  - Ranger
+  - Explorer
+  - Voyager
+  - Traveler
+  - Warrior
+  - Hunter
+  - Scout
+  - Mage
+  - Rogue
+  animals:
+  - Lion
+  - Tiger
+  - Bear
+  - Fox
+  - Hawk
+  - Owl
+  - Raven
+  - Falcon
+  - Panther
+  - Leopard
+  - Cheetah
+  - Wolf
+  - Eagle
+  - Horse
+  - Deer
+  - Hound
+--- !u!224 &1784502662
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1784502660}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 1266, y: 585}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1807225547 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 3736677220417079088, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
@@ -6630,7 +6595,7 @@ MonoBehaviour:
   eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   passwordEyeIcon: {fileID: 0}
-  loginScreenSceneName: 
+  loginScreenSceneName: Loading Screen 1
 --- !u!1 &1936143508
 GameObject:
   m_ObjectHideFlags: 0
@@ -6718,11 +6683,11 @@ GameObject:
   - component: {fileID: 1953494810}
   - component: {fileID: 1953494809}
   - component: {fileID: 1953494808}
-  - component: {fileID: 1953494813}
   - component: {fileID: 1953494815}
-  - component: {fileID: 1953494817}
   - component: {fileID: 1953494818}
   - component: {fileID: 1953494819}
+  - component: {fileID: 1953494820}
+  - component: {fileID: 1953494813}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -6811,6 +6776,7 @@ RectTransform:
   - {fileID: 1288287488}
   - {fileID: 2092172948}
   - {fileID: 812443601}
+  - {fileID: 458899617}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -6876,27 +6842,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 59b4fd652f7b2404a9041dc66dc27282, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &1953494817
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1953494807}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40c91d847d20afa43bedc8f2595fd9cd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_GuestNameInput: {fileID: 1455765349}
-  m_NameChangePanel: {fileID: 1288287491}
-  m_PlayButton: {fileID: 0}
-  m_PlayAsGuestBtn: {fileID: 88770643}
-  m_LogInBtn: {fileID: 0}
-  m_StatusText: {fileID: 0}
-  m_LoginButtonsPanel: {fileID: 0}
-  m_SceneChanger: {fileID: 1953494815}
-  m_Scene2Name: Main Screen
 --- !u!114 &1953494818
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6909,7 +6854,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3971c67e2673cdb45b902b7c7858f653, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  exitPanel: {fileID: 473222660}
+  exitPanel: {fileID: 458899616}
 --- !u!114 &1953494819
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6922,6 +6867,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 105cc998dfd2da64cbe0b27170f1bd96, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1953494820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1953494807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5455a7ec84a977244bd86088b8cdf1bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  usernameDisplayText: {fileID: 1455765349}
+  usernameInputField: {fileID: 1455765349}
+  generateNewButton: {fileID: 810157445}
+  loginButton: {fileID: 88770643}
+  updateUsernameButton: {fileID: 730087670}
+  loadingScreenSceneName: 
+  mainScreenSceneName: Main Screen
+  loadingScreenDuration: 2
+  useSceneLoading: 0
+  generateOnAwake: 1
+  generateOnStart: 1
+  enabledButtonColor: {r: 1, g: 1, b: 1, a: 1}
+  disabledButtonColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
 --- !u!114 &1956305579 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 9062706664567730000, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
@@ -7112,7 +7082,6 @@ RectTransform:
   - {fileID: 746501822}
   - {fileID: 1693590681}
   - {fileID: 1846142387}
-  - {fileID: 458899617}
   m_Father: {fileID: 1953494811}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -7722,5 +7691,5 @@ SceneRoots:
   m_Roots:
   - {fileID: 622604858}
   - {fileID: 1759641355}
-  - {fileID: 1355970990}
+  - {fileID: 1784502662}
   - {fileID: 1953494811}

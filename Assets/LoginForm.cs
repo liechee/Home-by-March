@@ -26,8 +26,8 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private Image  eyeIconImage;
 
     [Header("Scene Loading")]
-    [SerializeField] private string mainScreenSceneName    = "MainScreen";
-    [SerializeField] private string loadingScreenSceneName = "LoadingScreen";
+    [SerializeField] private string mainScreenSceneName    = "Main Screen";
+    [SerializeField] private string loadingScreenSceneName = "Loading Screen 1";
     [SerializeField] private string signUpSceneName        = "SignUpScene";
     [SerializeField] private float  loadingScreenDuration  = 2f;
 
@@ -56,7 +56,7 @@ public class LoginForm : MonoBehaviour
 
     private void Start()
     {
-        // Find PlayerData reference
+        // Resolve the current PlayerData reference if one is already live.
         FindPlayerData();
         
         SetupPasswordToggle();
@@ -78,11 +78,25 @@ public class LoginForm : MonoBehaviour
 
     private void FindPlayerData()
     {
-        playerData = FindObjectOfType<PlayerData>();
+        playerData = AuthManager.Instance?.CurrentPlayerData ?? FindObjectOfType<PlayerData>();
+    }
+
+    private bool TryGetPlayerData(out PlayerData resolvedPlayerData)
+    {
+        if (AuthManager.Instance?.CurrentPlayerData != null)
+        {
+            resolvedPlayerData = AuthManager.Instance.CurrentPlayerData;
+            playerData = resolvedPlayerData;
+            return true;
+        }
+
         if (playerData == null)
         {
-            Debug.LogWarning("[LoginForm] PlayerData not found in scene.");
+            FindPlayerData();
         }
+
+        resolvedPlayerData = playerData;
+        return resolvedPlayerData != null;
     }
 
     // ── Auth-ready coroutine ──────────────────────────────────────────────────
@@ -114,21 +128,16 @@ public class LoginForm : MonoBehaviour
     /// </summary>
     private void SyncPlayerDataName(string username)
     {
-        if (playerData != null && !string.IsNullOrEmpty(username))
+        if (string.IsNullOrEmpty(username))
+        {
+            return;
+        }
+
+        if (TryGetPlayerData(out var resolvedPlayerData))
         {
             // Use PlayerData API so it triggers change notifications and saves properly
-            playerData.ChangePlayerName(username);
+            resolvedPlayerData.ChangePlayerName(username);
             Debug.Log($"[LoginForm] Synced player name to PlayerData: {username}");
-        }
-        else if (playerData == null)
-        {
-            Debug.LogWarning("[LoginForm] Cannot sync player name - PlayerData reference is null.");
-            // Try to find PlayerData again
-            FindPlayerData();
-            if (playerData != null && !string.IsNullOrEmpty(username))
-            {
-                playerData.ChangePlayerName(username);
-            }
         }
     }
 
@@ -239,9 +248,6 @@ public class LoginForm : MonoBehaviour
 
         if (result.IsSuccess)
         {
-            // Sync the username to PlayerData after successful sign in
-            SyncPlayerDataName(username);
-            
             ShowStatusMessage("Sign in successful!", false);
             // OnAuthStateChanged will fire and load the main screen
         }

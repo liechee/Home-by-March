@@ -81,15 +81,16 @@ public class AccountHubUI : MonoBehaviour
 
     private void Start()
     {
+        ValidateSetup();
         SetWaitingText(false);
 
         // Hide everything until we know the auth state (avoids a one-frame flicker).
-        m_SignOutBtn?.SetActive(false);
-        m_SignInBtn?.SetActive(false);
-        m_RegisterBtn?.SetActive(false);
-        m_ButtonContainer?.SetActive(false);
-        m_SignInPanel?.SetActive(false);
-        m_RegisterPanel?.SetActive(false);
+        SetUiActiveSafely(m_SignOutBtn, false, nameof(m_SignOutBtn));
+        SetUiActiveSafely(m_SignInBtn, false, nameof(m_SignInBtn));
+        SetUiActiveSafely(m_RegisterBtn, false, nameof(m_RegisterBtn));
+        SetUiActiveSafely(m_ButtonContainer, false, nameof(m_ButtonContainer));
+        SetUiActiveSafely(m_SignInPanel, false, nameof(m_SignInPanel));
+        SetUiActiveSafely(m_RegisterPanel, false, nameof(m_RegisterPanel));
 
         SetupPasswordToggles();
         SetupButtons();
@@ -134,8 +135,11 @@ public class AccountHubUI : MonoBehaviour
     {
         RefreshUI();
 
+        bool isGuest = AuthManager.Instance != null && AuthManager.Instance.IsGuest;
+        bool isRegisteredSignedIn = AuthManager.Instance != null && AuthManager.Instance.IsSignedIn && !isGuest;
+
         // Reset cloud-load gate if we're no longer signed in.
-        if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn)
+        if (!isRegisteredSignedIn)
         {
             _cloudLoadTriggered = false;
             return;
@@ -154,23 +158,23 @@ public class AccountHubUI : MonoBehaviour
     {
         if (AuthManager.Instance == null) return;
 
-        bool isGuest    = AuthManager.Instance.IsGuest;
-        bool isSignedIn = AuthManager.Instance.IsSignedIn;
+        bool isGuest = AuthManager.Instance.IsGuest;
+        bool isRegisteredSignedIn = AuthManager.Instance.IsSignedIn && !isGuest;
 
         if (m_StatusText != null)
         {
             var sb = new StringBuilder();
-            if (isSignedIn)
+            if (isRegisteredSignedIn)
             {
                 string name = AuthManager.Instance.CloudUsername
                               ?? PlayerPrefs.GetString("LastSignedInPlayer", "Player");
                 sb.AppendLine($"Signed in as: <b>{name}</b>");
-                sb.AppendLine("Your progress is saved across all devices.");
+                sb.AppendLine("Your journey is bound. Save your progress and carry every step with you — continue your march home from any device, anywhere");
             }
             else if (isGuest)
             {
-                sb.AppendLine($"Playing as: <b>{AuthManager.Instance.GuestName}</b>");
-                sb.AppendLine("Sign in or register to save your progress.");
+                sb.AppendLine($"Playing as a guest.");
+                sb.AppendLine("Your progress is not yet safe. Register to save your progress or Sign in to continue to an existing account.");
             }
             else
             {
@@ -178,21 +182,25 @@ public class AccountHubUI : MonoBehaviour
             }
             m_StatusText.text = sb.ToString();
         }
+        // Sign-in and register buttons: guests ONLY.
+        SetUiActiveSafely(m_SignInBtn, isGuest && !_isProcessing, nameof(m_SignInBtn));
+        SetUiActiveSafely(m_RegisterBtn, isGuest && !_isProcessing, nameof(m_RegisterBtn));
 
-        m_ButtonContainer?.SetActive(true);
+        SetUiActiveSafely(m_ButtonContainer, true, nameof(m_ButtonContainer));
 
         // Logout button: registered players ONLY.
-        m_SignOutBtn?.SetActive(isSignedIn);
+        SetUiActiveSafely(m_SignOutBtn, isRegisteredSignedIn, nameof(m_SignOutBtn));
 
-        // Sign-in and register buttons: guests ONLY.
-        m_SignInBtn?.SetActive(isGuest && !_isProcessing);
-        m_RegisterBtn?.SetActive(isGuest && !_isProcessing);
+        if (isGuest)
+        {
+            SetUiActiveSafely(m_ButtonContainer, false, nameof(m_ButtonContainer));
+        }
 
         // Close panels if the player just signed in.
-        if (isSignedIn)
+        if (isRegisteredSignedIn)
         {
-            m_SignInPanel?.SetActive(false);
-            m_RegisterPanel?.SetActive(false);
+            SetUiActiveSafely(m_SignInPanel, false, nameof(m_SignInPanel));
+            SetUiActiveSafely(m_RegisterPanel, false, nameof(m_RegisterPanel));
             SetWaitingText(false);
         }
     }
@@ -264,6 +272,13 @@ public class AccountHubUI : MonoBehaviour
     public void OnSignOutButtonClicked()
     {
         if (AuthManager.Instance == null) return;
+
+        LogOutManager logoutManager = FindObjectOfType<LogOutManager>();
+        if (logoutManager != null)
+        {
+            logoutManager.LogoutAndRestart();
+            return;
+        }
 
         AuthManager.Instance.SignOut();
 
@@ -440,6 +455,33 @@ public class AccountHubUI : MonoBehaviour
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void ValidateSetup()
+    {
+        if (m_StatusText == null)
+            Debug.LogWarning("[AccountHubUI] m_StatusText is not assigned. Status text will not update.");
+
+        if (m_ButtonContainer == null)
+            Debug.LogWarning("[AccountHubUI] m_ButtonContainer is not assigned. Button group visibility may be inconsistent.");
+
+        if (AuthManager.Instance == null)
+            Debug.LogWarning("[AccountHubUI] AuthManager.Instance is null. UI cannot refresh auth state until AuthManager exists.");
+    }
+
+    private void SetUiActiveSafely(GameObject target, bool active, string fieldName)
+    {
+        if (target == null) return;
+
+        // Do not disable the object that hosts this script (or one of its parents),
+        // otherwise this component stops running and the UI can get stuck hidden.
+        if (!active && (target == gameObject || transform.IsChildOf(target.transform)))
+        {
+            Debug.LogWarning($"[AccountHubUI] Skipped disabling {fieldName} because it contains this AccountHubUI component. Move AccountHubUI to an always-active object (for example the Canvas root).", this);
+            return;
+        }
+
+        target.SetActive(active);
+    }
 
     private void SetWaitingText(bool visible)
     {

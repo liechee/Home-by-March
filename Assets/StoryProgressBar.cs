@@ -17,12 +17,12 @@ public class StoryProgressBar : MonoBehaviour
 
     void OnEnable()
     {
-        PlayerPrefsCloudSync.onPlayerPrefsLoaded += UpdateProgressBar;
+        PlayerPrefsCloudSync2.onPlayerPrefsLoaded += UpdateProgressBar;
     }
 
     void OnDisable()
     {
-        PlayerPrefsCloudSync.onPlayerPrefsLoaded -= UpdateProgressBar;
+        PlayerPrefsCloudSync2.onPlayerPrefsLoaded -= UpdateProgressBar;
     }
 
     void Start()

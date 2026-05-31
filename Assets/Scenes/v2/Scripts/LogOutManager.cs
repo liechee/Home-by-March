@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Unity.Services.Authentication;
@@ -9,8 +10,8 @@ using UnityEngine.SceneManagement;
 using Unity.Services.Authentication.PlayerAccounts.Samples;
 
 /// <summary>
-/// Performs a full local data wipe and reloads the login screen.
-/// Cloud data is intentionally preserved — only device-local state is cleared.
+/// Signs out of the current session and reloads the login screen.
+/// Cloud data and local save data are intentionally preserved.
 ///
 /// Call LogoutAndRestart() from any UI button (e.g. Scene2AuthUI.OnSignOutButtonClicked).
 /// </summary>
@@ -31,33 +32,38 @@ public class LogOutManager : MonoBehaviour
     {
         Debug.Log("[LogOut] ── Starting logout ──────────────────────────────────");
 
-        // 1. Block any in-flight cloud saves before we wipe.
+        // Let the UI show a frame before the sign-out work starts.
+        if (loadingPanel != null) loadingPanel.SetActive(true);
+        await Task.Yield();
+
         OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
         if (stepCounter != null)
         {
             stepCounter.isLoggingOut = true;
-            Debug.Log("[LogOut] Save guard enabled.");
+            stepCounter.ResetStepDataCompletely();
+            Debug.Log("[LogOut] Step data reset.");
         }
 
-        PlayerPrefsCloudSyncButton syncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
-        if (syncButton != null) syncButton.enabled = false;
+        PlayerData playerData = FindObjectOfType<PlayerData>();
+        if (playerData != null)
+        {
+            playerData.isLoggingOut = true;
+            playerData.Reset();
+            Debug.Log("[LogOut] PlayerData reset.");
+        }
 
-        // 2. Sign out of Unity services (also clears on-disk session token).
+        ResetInventoryObjects();
+        DeleteLocalSaveFiles();
+        ClearPlayerPrefsForNewSession();
+
+        // Sign out of Unity services (also clears on-disk session token).
         await EnsureServicesInitializedAsync();
         SignOutServices();
 
-        // 3. Wipe all local data (PlayerPrefs, persistent files, ScriptableObjects,
-        //    DontDestroyOnLoad objects).
-        WipeLocalData(stepCounter);
-
-        // 4. Write the logout flag AFTER PlayerPrefs.DeleteAll() so it is the
-        //    only key present. Scene1LoginUI reads this to skip auto-resume.
+        // Mark the session as explicitly logged out so Scene1 does not auto-resume.
         PlayerPrefs.SetInt(AuthManager1.PrefHasLoggedOut, 1);
         PlayerPrefs.Save();
         Debug.Log("[LogOut] Logout flag written.");
-
-        // 5. Show loading UI and reload.
-        if (loadingPanel != null) loadingPanel.SetActive(true);
 
         // Capture locals before the async gap to avoid captured-variable issues.
         float  delay     = reloadDelay;
@@ -97,108 +103,73 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
-    // ── Local data wipe ───────────────────────────────────────────────────────
-
-    private void WipeLocalData(OverallStepCounter stepCounter)
+    private static void ClearPlayerPrefsForNewSession()
     {
-        ResetStepCounter(stepCounter);
-        ResetUserLevels();
-        PlayerPrefs.DeleteAll();        // logout flag is written AFTER this call
+        PlayerPrefs.DeleteAll();
+        PlayerPrefs.SetInt(AuthManager1.PrefHasLoggedOut, 1);
         PlayerPrefs.Save();
-        DeletePersistentFiles();
-        ResetScriptableObjects();
-        DestroyPersistentObjects(stepCounter);
-        Debug.Log("[LogOut] Local data wipe complete.");
     }
 
-    private static void ResetStepCounter(OverallStepCounter stepCounter)
-    {
-        if (stepCounter == null) return;
-        stepCounter.ResetStepDataCompletely();
-        Debug.Log("[LogOut] OverallStepCounter reset.");
-    }
-
-    private static void ResetUserLevels()
-    {
-        foreach (UserLevel ul in FindObjectsOfType<UserLevel>())
-        {
-            ul.dailyStepCount   = 0;
-            ul.overallStepCount = 0;
-            ul.currentStepCount = 0;
-        }
-    }
-
-    private static void DeletePersistentFiles()
+    private static void DeleteLocalSaveFiles()
     {
         string root = Application.persistentDataPath;
+        foreach (string relativePath in GetLocalSaveFileNames())
+        {
+            DeleteFileIfExists(Path.Combine(root, relativePath));
+        }
+
         if (!Directory.Exists(root)) return;
 
-        foreach (string file in Directory.GetFiles(root, "*.*", SearchOption.AllDirectories))
+        foreach (string datFile in Directory.GetFiles(root, "*.dat", SearchOption.AllDirectories))
+        {
+            DeleteFileIfExists(datFile);
+        }
+    }
+
+    private static IEnumerable<string> GetLocalSaveFileNames()
+    {
+        return new[]
+        {
+            "playerData.json",
+            "stepData.json",
+            "questData.json",
+            "playerPositionData.json",
+            "guestNameDraft.json",
+            "playerDailyQuestData.json",
+            "optimized_inventory.json",
+            "test.json"
+        };
+    }
+
+    private static void DeleteFileIfExists(string path)
+    {
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+            File.Delete(path);
+            Debug.Log($"[LogOut] Deleted local save: {Path.GetFileName(path)}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[LogOut] Could not delete {Path.GetFileName(path)}: {e.Message}");
+        }
+    }
+
+    private static void ResetInventoryObjects()
+    {
+        foreach (InventoryObject inventoryObject in Resources.FindObjectsOfTypeAll<InventoryObject>())
         {
             try
             {
-                File.SetAttributes(file, FileAttributes.Normal);
-                File.Delete(file);
-                Debug.Log($"[LogOut] Deleted: {Path.GetFileName(file)}");
+                inventoryObject.Clear();
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[LogOut] Could not delete {Path.GetFileName(file)}: {e.Message}");
-                // Last-resort: overwrite with empty content then retry delete.
-                try { File.WriteAllText(file, ""); File.Delete(file); }
-                catch { Debug.LogError($"[LogOut] Force-delete failed: {Path.GetFileName(file)}"); }
-            }
-        }
-
-        // Clean up empty directories left behind.
-        foreach (string dir in Directory.GetDirectories(root, "*", SearchOption.AllDirectories))
-        {
-            try { Directory.Delete(dir, recursive: true); }
-            catch (Exception e) { Debug.LogWarning($"[LogOut] Could not remove dir: {e.Message}"); }
-        }
-    }
-
-    private static void ResetScriptableObjects()
-    {
-        foreach (InventoryObject inv in Resources.FindObjectsOfTypeAll<InventoryObject>())
-        {
-            try { inv.Container.Clear(); }
-            catch (Exception e) { Debug.LogWarning($"[LogOut] Could not clear {inv.name}: {e.Message}"); }
-        }
-    }
-
-    /// <summary>
-    /// Destroys all DontDestroyOnLoad objects except this manager itself, the
-    /// OverallStepCounter (already reset), EventSystem, and AudioListener.
-    /// </summary>
-    private void DestroyPersistentObjects(OverallStepCounter stepCounter)
-    {
-        GameObject self           = gameObject;
-        GameObject stepCounterObj = stepCounter != null ? stepCounter.gameObject : null;
-
-        foreach (GameObject obj in FindObjectsOfType<GameObject>())
-        {
-            if (obj == null)             continue;
-            if (obj == self)             continue;
-            if (obj == stepCounterObj)   continue;
-            if (obj.scene.name != "DontDestroyOnLoad") continue;
-
-            string objName = "<unknown>";
-            try { objName = obj.name; } catch { /* already destroyed */ }
-
-            // Keep infrastructure objects that other systems rely on.
-            if (objName.Contains("EventSystem") || objName.Contains("AudioListener"))
-                continue;
-
-            try
-            {
-                DestroyImmediate(obj);
-                Debug.Log($"[LogOut] Destroyed: {objName}");
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[LogOut] Could not destroy {objName}: {e.Message}");
+                Debug.LogWarning($"[LogOut] Could not clear inventory '{inventoryObject.name}': {e.Message}");
             }
         }
     }
+
 }

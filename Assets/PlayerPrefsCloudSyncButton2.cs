@@ -211,7 +211,7 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
         string playerId = GetCurrentPlayerId();
         Debug.Log($"[CloudSync] Saving data for Player ID: {playerId}");
 
-        await PlayerPrefsCloudSync.SaveAllToCloud();
+        await PlayerPrefsCloudSync2.SaveAllToCloud();
         Debug.Log("[CloudSync] PlayerPrefs saved.");
 
         if (playerData != null)
@@ -256,7 +256,7 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
 
         Debug.Log("[CloudSync] ── LoadNonStepDataFromCloud ───────────────────");
 
-        await PlayerPrefsCloudSync.LoadAllFromCloud();
+        await PlayerPrefsCloudSync2.LoadAllFromCloud();
         Debug.Log("[CloudSync] PlayerPrefs loaded.");
 
         if (playerData != null)

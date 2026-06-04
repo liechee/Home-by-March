@@ -36,14 +36,21 @@ public class SignUpForm : MonoBehaviour
     [SerializeField] private Sprite eyeClosedSprite;
     [SerializeField] private Image  passwordEyeIcon;
 
+    [Header("ConfirmPassword Visibility")]
+    [SerializeField] private Button showConfirmPasswordButton;
+    [SerializeField] private Sprite eyeOpenSprite2;
+    [SerializeField] private Sprite eyeClosedSprite2;
+    [SerializeField] private Image  confirmPasswordEyeIcon;
+
     [Header("Scene Loading")]
-    [SerializeField] private string loginScreenSceneName = "LoginScreen";
-    private PlayerData playerData;
+    [SerializeField] private string loginScreenSceneName = "Log In";
+    [SerializeField] private string mainMenuSceneName     = "Main Screen";
 
     // ── Private state ─────────────────────────────────────────────────────────
 
     private bool isProcessing;
     private bool isPasswordVisible;
+    private bool isConfirmPasswordVisible;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -98,28 +105,19 @@ public class SignUpForm : MonoBehaviour
         // If a signed-in player somehow lands here, send them back.
         if (AuthManager.Instance.IsSignedIn)
         {
-            OnBackToLoginClicked();
+            GoToMainScreen();
             yield break;
         }
 
         SetUIInteractable(true);
     }
-     private void SyncPlayerDataName(string username)
-    {
-        if (playerData != null && !string.IsNullOrEmpty(username))
-        {
-            // Use PlayerData API so it triggers change notifications and saves properly
-            playerData.ChangePlayerName(username);
-        }
-    }
-
     // ── Auth state handler ────────────────────────────────────────────────────
 
     private void OnAuthStateChanged()
     {
-        // If sign-up succeeded and the player is now signed in, return to login.
+        // If sign-up succeeded and the player is now signed in, continue to the main screen.
         if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn && !isProcessing)
-            OnBackToLoginClicked();
+            GoToMainScreen();
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -133,6 +131,7 @@ public class SignUpForm : MonoBehaviour
     private void SetupPasswordToggle()
     {
         showPasswordButton?.onClick.AddListener(TogglePasswordVisibility);
+        showConfirmPasswordButton?.onClick.AddListener(ToggleConfirmPasswordVisibility);
 
         if (passwordInputField != null)
         {
@@ -147,7 +146,9 @@ public class SignUpForm : MonoBehaviour
         }
 
         UpdateEyeIcon();
+        UpdateConfirmPasswordEyeIcon();
     }
+    
 
     // ── Sign up ───────────────────────────────────────────────────────────────
 
@@ -158,7 +159,6 @@ public class SignUpForm : MonoBehaviour
         string username        = usernameInputField?.text?.Trim();
         string password        = passwordInputField?.text;
         string confirmPassword = confirmPasswordInputField?.text;
-        SyncPlayerDataName(username);
 
         if (!ValidateUsername(username)) return;
         if (!ValidatePassword(password)) return;
@@ -179,7 +179,7 @@ public class SignUpForm : MonoBehaviour
         {
             ShowStatusMessage("Account created successfully!", false);
             await Task.Delay(1500);
-            OnBackToLoginClicked();
+            GoToMainScreen();
         }
         else
         {
@@ -201,6 +201,18 @@ public class SignUpForm : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.LoadScene(loginScreenSceneName);
         else
             gameObject.SetActive(false);
+    }
+
+    private void GoToMainScreen()
+    {
+        if (usernameInputField        != null) usernameInputField.text        = "";
+        if (passwordInputField        != null) passwordInputField.text        = "";
+        if (confirmPasswordInputField != null) confirmPasswordInputField.text = "";
+
+        if (!string.IsNullOrEmpty(mainMenuSceneName))
+            UnityEngine.SceneManagement.SceneManager.LoadScene(mainMenuSceneName);
+        else
+            Debug.LogWarning("[SignUpForm] Main menu scene name is not set.");
     }
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -261,13 +273,23 @@ public class SignUpForm : MonoBehaviour
             passwordInputField.ForceLabelUpdate();
         }
 
+        UpdateEyeIcon();
+    }
+    private void ToggleConfirmPasswordVisibility()
+    {
+        isConfirmPasswordVisible = !isConfirmPasswordVisible;
+
+        TMP_InputField.ContentType type = isConfirmPasswordVisible
+            ? TMP_InputField.ContentType.Standard
+            : TMP_InputField.ContentType.Password;
+
         if (confirmPasswordInputField != null)
         {
             confirmPasswordInputField.contentType = type;
             confirmPasswordInputField.ForceLabelUpdate();
         }
 
-        UpdateEyeIcon();
+        UpdateConfirmPasswordEyeIcon();
     }
 
     private void UpdateEyeIcon()
@@ -275,6 +297,12 @@ public class SignUpForm : MonoBehaviour
         if (passwordEyeIcon == null) return;
         if (isPasswordVisible  && eyeOpenSprite  != null) passwordEyeIcon.sprite = eyeOpenSprite;
         if (!isPasswordVisible && eyeClosedSprite != null) passwordEyeIcon.sprite = eyeClosedSprite;
+    }
+    private void UpdateConfirmPasswordEyeIcon()
+    {
+        if (confirmPasswordEyeIcon == null) return;
+        if (isConfirmPasswordVisible  && eyeOpenSprite2  != null) confirmPasswordEyeIcon.sprite = eyeOpenSprite2;
+        if (!isConfirmPasswordVisible && eyeClosedSprite2 != null) confirmPasswordEyeIcon.sprite = eyeClosedSprite2;
     }
 
     // ── UI helpers ────────────────────────────────────────────────────────────

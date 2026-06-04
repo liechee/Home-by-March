@@ -109,7 +109,7 @@ public class PlayerProfileStatus : MonoBehaviour
 
             UpdateProfileStatus();
 
-            if (AuthManager1.Instance != null && AuthManager1.Instance.IsReady)
+            if (AuthManager.Instance != null && AuthManager.Instance.IsReady)
                 break;
 
             elapsed += Time.unscaledDeltaTime;

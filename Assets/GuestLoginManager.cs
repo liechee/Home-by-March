@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class GuestLoginManager : MonoBehaviour
 {
@@ -13,10 +14,7 @@ public class GuestLoginManager : MonoBehaviour
     [SerializeField] private Button updateUsernameButton;
     
     [Header("Scene Loading")]
-    [SerializeField] private string loadingScreenSceneName = "Loading Screen 1";
     [SerializeField] private string mainScreenSceneName = "Main Screen";
-    [SerializeField] private float loadingScreenDuration = 5f;
-    [SerializeField] private bool useSceneLoading = true;
     
     [Header("Settings")]
     [SerializeField] private bool generateOnAwake = true;
@@ -31,7 +29,6 @@ public class GuestLoginManager : MonoBehaviour
     private bool isInitialized = false;
     private bool isProcessingLogin = false;
     
-    // Properties to access current username from other scripts
     public string CurrentUsername => currentSystemGeneratedUsername;
     public string SavedUsername => savedUsername;
     public bool IsInitialized => isInitialized;
@@ -39,57 +36,63 @@ public class GuestLoginManager : MonoBehaviour
     
     private void Awake()
     {
-        // Initialize on Awake if specified
         if (generateOnAwake)
-        {
             InitializeAndGenerateUsername();
-        }
     }
     
     private void Start()
     {
-        // Initialize on Start if not already done in Awake
         if (!isInitialized && generateOnStart)
-        {
             InitializeAndGenerateUsername();
-        }
     }
     
-    /// <summary>
-    /// Initialize the manager and generate username
-    /// </summary>
     private void InitializeAndGenerateUsername()
     {
-        // Get the generator instance
+        ClearStaleGuestLoginDraft();
+
         usernameGenerator = FindObjectOfType<GuestUsernameGenerator>();
         
         if (usernameGenerator == null)
         {
             Debug.LogError("GuestUsernameGenerator not found in scene! Creating one...");
-            // Create the generator if it doesn't exist
             GameObject generatorObj = new GameObject("GuestUsernameGenerator");
             usernameGenerator = generatorObj.AddComponent<GuestUsernameGenerator>();
         }
 
-        // Try to locate a live PlayerData so we can sync names properly
         if (playerData == null)
         {
             playerData = FindObjectOfType<PlayerData>();
             if (playerData == null)
-            {
-                Debug.Log("GuestLoginManager: PlayerData not found in scene. Guest name will fall back to PlayerPrefs/AuthManager.");
-            }
+                Debug.Log("GuestLoginManager: PlayerData not found in scene.");
         }
         
-        // Setup UI
         SetupButtons();
         SetupInputField();
-        
-        // Generate initial username
         GenerateAndDisplayUsername();
         
         isInitialized = true;
         Debug.Log("GuestLoginManager initialized and ready");
+    }
+
+    private void ClearStaleGuestLoginDraft()
+    {
+        if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
+            return;
+
+        PlayerPrefs.DeleteKey("LastGuestUsername");
+        PlayerPrefs.DeleteKey("LastLoginMethod");
+        PlayerPrefs.Save();
+    }
+
+    private void CommitGuestIdentity(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username)) return;
+
+        savedUsername = username.Trim();
+        SyncPlayerDataName(savedUsername);
+        PlayerPrefs.SetString("LastGuestUsername", savedUsername);
+        PlayerPrefs.SetString("LastLoginMethod", "Guest");
+        PlayerPrefs.Save();
     }
     
     private void SetupButtons()
@@ -103,7 +106,6 @@ public class GuestLoginManager : MonoBehaviour
         if (updateUsernameButton != null)
         {
             updateUsernameButton.onClick.AddListener(OnUpdateUsername);
-            // Initially disable the update button
             SetUpdateButtonState(false);
         }
     }
@@ -112,109 +114,66 @@ public class GuestLoginManager : MonoBehaviour
     {
         if (usernameInputField != null)
         {
-            // Add listener for when the text changes
             usernameInputField.onValueChanged.AddListener(OnUsernameInputChanged);
-            
-            // Add listener for when the input field is submitted (Enter key)
             usernameInputField.onSubmit.AddListener(OnUsernameSubmit);
         }
     }
     
-    /// <summary>
-    /// Called whenever the input field text changes
-    /// </summary>
     private void OnUsernameInputChanged(string newText)
     {
         if (!isInitialized) return;
         
-        // Enable update button if text is different from system-generated username
         bool shouldEnable = !string.IsNullOrEmpty(newText) && newText != currentSystemGeneratedUsername;
-        
         SetUpdateButtonState(shouldEnable);
         
-        // Optional: Add visual feedback for invalid username
         if (!string.IsNullOrEmpty(newText) && usernameGenerator != null && usernameGenerator.IsUsernameTaken(newText))
         {
-            // Username is taken, show warning
             if (usernameInputField.targetGraphic != null)
-            {
                 usernameInputField.targetGraphic.color = Color.red;
-            }
             
-            // Also disable update button if username is taken
             if (shouldEnable)
-            {
                 SetUpdateButtonState(false);
-            }
         }
         else
         {
             if (usernameInputField.targetGraphic != null)
-            {
                 usernameInputField.targetGraphic.color = Color.white;
-            }
         }
     }
     
-    /// <summary>
-    /// Called when Enter key is pressed in the input field
-    /// </summary>
     private void OnUsernameSubmit(string text)
     {
         if (updateUsernameButton != null && updateUsernameButton.interactable)
-        {
             OnUpdateUsername();
-        }
     }
     
-    /// <summary>
-    /// Generate a new system username
-    /// </summary>
     private void GenerateAndDisplayUsername()
     {
-        // Generate a new guest username
         currentSystemGeneratedUsername = usernameGenerator.GenerateGuestUsername();
         originalUsername = currentSystemGeneratedUsername;
         
-        // Display it
         if (usernameDisplayText != null)
-        {
             usernameDisplayText.text = $"System Generated: {currentSystemGeneratedUsername}";
-        }
         
-        // Set input field text
         if (usernameInputField != null)
-        {
             usernameInputField.text = currentSystemGeneratedUsername;
-        }
         
-        // Disable update button since it matches the system username
         SetUpdateButtonState(false);
-        
         Debug.Log($"Generated guest username: {currentSystemGeneratedUsername}");
     }
     
-    /// <summary>
-    /// Update the username with the text from input field and proceed to loading
-    /// </summary>
     private void OnUpdateUsername()
     {
-        if (isProcessingLogin)
-        {
-            Debug.Log("Already processing login, please wait...");
-            return;
-        }
+        if (isProcessingLogin) return;
         
         if (usernameInputField == null || string.IsNullOrEmpty(usernameInputField.text))
             return;
         
         string newUsername = usernameInputField.text.Trim();
         
-        // Validate username
         if (usernameGenerator.IsUsernameTaken(newUsername))
         {
             Debug.LogWarning($"Username '{newUsername}' is already taken!");
-            // Show error message to user
             if (usernameDisplayText != null)
             {
                 usernameDisplayText.text = $"Error: '{newUsername}' is already taken!";
@@ -223,241 +182,103 @@ public class GuestLoginManager : MonoBehaviour
             return;
         }
         
-        // Save the new username
-        savedUsername = newUsername;
-        SyncPlayerDataName(savedUsername);
-        // Persist for access in other scenes / main menu
-        PlayerPrefs.SetString("LastGuestUsername", savedUsername);
-        PlayerPrefs.SetString("LastLoginMethod", "Guest");
-        PlayerPrefs.Save();
+        CommitGuestIdentity(newUsername);
         currentSystemGeneratedUsername = newUsername;
         originalUsername = newUsername;
-        
-        // Register the new username
         usernameGenerator.RegisterUsername(currentSystemGeneratedUsername);
         
-        // Update display
         if (usernameDisplayText != null)
-        {
             usernameDisplayText.text = $"Username Saved: {currentSystemGeneratedUsername}";
-        }
         
-        // Disable update button after successful update
         SetUpdateButtonState(false);
         
-        // Disable input field to prevent further changes during loading
         if (usernameInputField != null)
-        {
             usernameInputField.interactable = false;
-        }
         
-        // Disable generate new button
         if (generateNewButton != null)
-        {
             generateNewButton.interactable = false;
-        }
         
         Debug.Log($"Username updated and saved to: {currentSystemGeneratedUsername}");
         
-        // Start the loading process
-        StartCoroutine(LoadGameSequence());
+        LoadMainScreen();
     }
+
     private void SyncPlayerDataName(string username)
     {
-        if (!string.IsNullOrEmpty(username))
+        if (string.IsNullOrEmpty(username)) return;
+
+        if (playerData == null)
+            playerData = FindObjectOfType<PlayerData>();
+
+        if (playerData != null)
         {
-            // Prefer updating a live PlayerData component if available
-            if (playerData == null)
-                playerData = FindObjectOfType<PlayerData>();
+            playerData.ChangePlayerName(username);
+            return;
+        }
 
-            if (playerData != null)
+        try
+        {
+            if (AuthManager.Instance == null)
             {
-                playerData.ChangePlayerName(username);
-                return;
+                Debug.LogWarning("GuestLoginManager: AuthManager.Instance is null.");
             }
-
-            // If PlayerData isn't available, use the public AuthManager API directly
-            try
+            else
             {
-                if (AuthManager.Instance == null)
-                {
-                    Debug.LogWarning("GuestLoginManager: AuthManager.Instance is null — cannot route guest name to AuthManager.");
-                }
-                else
-                {
-                    Debug.Log($"GuestLoginManager: calling AuthManager.SetGuestSessionAsync (IsReady={AuthManager.Instance.IsReady})");
-                    // Fire-and-forget: let AuthManager handle PlayerData/cloud saving for guest sessions
-                    _ = AuthManager.Instance.SetGuestSessionAsync(username);
-                }
+                Debug.Log($"GuestLoginManager: calling AuthManager.SetGuestSessionAsync");
+                _ = AuthManager.Instance.SetGuestSessionAsync(username);
             }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"GuestLoginManager: AuthManager.SetGuestSessionAsync call failed: {e.Message}");
-            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"GuestLoginManager: SetGuestSessionAsync failed: {e.Message}");
         }
     }
     
-    /// <summary>
-    /// Generate a completely new system username
-    /// </summary>
     private void OnGenerateNewUsername()
     {
         if (isProcessingLogin) return;
         
-        // Generate new username
         currentSystemGeneratedUsername = usernameGenerator.GenerateGuestUsername();
         originalUsername = currentSystemGeneratedUsername;
         
-        // Update UI
         if (usernameDisplayText != null)
-        {
             usernameDisplayText.text = $"System Generated: {currentSystemGeneratedUsername}";
-        }
         
         if (usernameInputField != null)
-        {
             usernameInputField.text = currentSystemGeneratedUsername;
-        }
         
-        // Disable update button since it matches the new system username
         SetUpdateButtonState(false);
-        
         Debug.Log($"New system username generated: {currentSystemGeneratedUsername}");
     }
     
-    /// <summary>
-    /// Login as guest with current username (without updating)
-    /// </summary>
     private void OnLoginAsGuest()
     {
         if (isProcessingLogin) return;
         
         if (!string.IsNullOrEmpty(currentSystemGeneratedUsername))
         {
-            savedUsername = currentSystemGeneratedUsername;
-            // Persist guest login for main menu
-            PlayerPrefs.SetString("LastGuestUsername", savedUsername);
-            PlayerPrefs.SetString("LastLoginMethod", "Guest");
-            PlayerPrefs.Save();
+            CommitGuestIdentity(currentSystemGeneratedUsername);
             Debug.Log($"Logging in as guest: {currentSystemGeneratedUsername}");
             
-            // Show login message
             if (usernameDisplayText != null)
-            {
-                usernameDisplayText.text = $"Logging in as: {currentSystemGeneratedUsername}...";
-            }
+                usernameDisplayText.text = $"{currentSystemGeneratedUsername}...";
             
-            // Sync with AuthManager so guest session is registered and can be upgraded later
-            SyncPlayerDataName(savedUsername);
-            
-            // Disable UI during loading
             SetUIInteractable(false);
-            
-            // Start loading sequence
-            StartCoroutine(LoadGameSequence());
+            LoadMainScreen();
         }
     }
-    
-    /// <summary>
-    /// Load loading screen, wait 5 seconds, then load main screen
-    /// </summary>
-    private IEnumerator LoadGameSequence()
-    {
-        isProcessingLogin = true;
-        
-        Debug.Log("Starting game loading sequence...");
-        
-        if (useSceneLoading)
-        {
-            // Load the loading screen
-            yield return StartCoroutine(LoadSceneAsync(loadingScreenSceneName));
-            
-            // Wait for 5 seconds on the loading screen
-            yield return new WaitForSeconds(loadingScreenDuration);
-            
-            // Load the main screen
-            yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
-        }
-        else
-        {
-            // Simulate loading without scene changes (for testing)
-            Debug.Log($"Simulating loading: Would show {loadingScreenSceneName} for {loadingScreenDuration} seconds, then load {mainScreenSceneName}");
-            
-            // You can activate/deactivate GameObjects here instead of loading scenes
-            yield return new WaitForSeconds(loadingScreenDuration);
 
-            // When scene-loading is disabled in inspector, attempt to load the main scene anyway
-            Debug.Log("Scene loading is disabled; attempting to load main scene directly after simulated delay...");
-            if (IsSceneValid(mainScreenSceneName))
-            {
-                yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
-            }
-            else
-            {
-                Debug.LogWarning($"Main scene '{mainScreenSceneName}' not found in build settings. Attempting direct load as fallback.");
-                try
-                {
-                    UnityEngine.SceneManagement.SceneManager.LoadScene(mainScreenSceneName);
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"Failed to load main scene '{mainScreenSceneName}' as fallback: {ex.Message}");
-                }
-            }
-        }
-        
-        isProcessingLogin = false;
-        Debug.Log("Game loading sequence completed!");
-    }
-    
-    /// <summary>
-    /// Load a scene asynchronously
-    /// </summary>
-    private IEnumerator LoadSceneAsync(string sceneName)
+    // ── Scene Loading ─────────────────────────────────────────────────────────
+
+    private void LoadMainScreen()
     {
-        Debug.Log($"Loading scene: {sceneName}");
-        
-        // Check if scene exists
-        if (!IsSceneValid(sceneName))
-        {
-            Debug.LogError($"Scene '{sceneName}' not found in build settings!");
-            yield break;
-        }
-        
-        // Load scene asynchronously
-        AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
-        
-        // Wait until the scene is fully loaded
-        while (!asyncLoad.isDone)
-        {
-            // You can update a loading progress bar here if needed
-            float progress = Mathf.Clamp01(asyncLoad.progress / 0.9f);
-            Debug.Log($"Loading progress: {progress * 100}%");
-            yield return null;
-        }
+        if (isProcessingLogin) return;
+        isProcessingLogin = true;
+
+        Debug.Log($"[GuestLoginManager] Loading main screen: '{mainScreenSceneName}'");
+        SceneManager.LoadScene(mainScreenSceneName);
     }
     
-    /// <summary>
-    /// Check if a scene is valid and added to build settings
-    /// </summary>
-    private bool IsSceneValid(string sceneName)
-    {
-        int sceneCount = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
-        for (int i = 0; i < sceneCount; i++)
-        {
-            string scenePath = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
-            string sceneNameFromPath = System.IO.Path.GetFileNameWithoutExtension(scenePath);
-            if (string.Equals(sceneNameFromPath, sceneName, System.StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /// <summary>
-    /// Set UI interactable state
-    /// </summary>
     private void SetUIInteractable(bool interactable)
     {
         if (usernameInputField != null)
@@ -473,61 +294,29 @@ public class GuestLoginManager : MonoBehaviour
             loginButton.interactable = interactable;
     }
     
-    /// <summary>
-    /// Set the update button's interactable state
-    /// </summary>
     private void SetUpdateButtonState(bool isEnabled)
     {
         if (updateUsernameButton != null && !isProcessingLogin)
         {
             updateUsernameButton.interactable = isEnabled;
             
-            // Optional: Change button color to indicate state
             var buttonColors = updateUsernameButton.colors;
-            if (isEnabled)
-            {
-                buttonColors.normalColor = enabledButtonColor;
-            }
-            else
-            {
-                buttonColors.normalColor = disabledButtonColor;
-            }
+            buttonColors.normalColor = isEnabled ? enabledButtonColor : disabledButtonColor;
             updateUsernameButton.colors = buttonColors;
         }
     }
     
-    /// <summary>
-    /// Reset display text after delay
-    /// </summary>
     private IEnumerator ResetDisplayTextAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
         if (usernameDisplayText != null)
-        {
             usernameDisplayText.text = $"{currentSystemGeneratedUsername}";
-        }
     }
     
-    /// <summary>
-    /// Restore the display text
-    /// </summary>
-    private void RestoreDisplayText()
-    {
-        if (usernameDisplayText != null)
-        {
-            usernameDisplayText.text = $"{currentSystemGeneratedUsername}";
-        }
-    }
-    
-    /// <summary>
-    /// Manually trigger username generation (can be called from other scripts)
-    /// </summary>
     public void ForceGenerateNewUsername()
     {
         if (usernameGenerator != null)
-        {
             GenerateAndDisplayUsername();
-        }
         else
         {
             Debug.LogWarning("Username generator not initialized yet!");
@@ -535,32 +324,16 @@ public class GuestLoginManager : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Get the current username (for external use)
-    /// </summary>
-    public string GetCurrentUsername()
-    {
-        return currentSystemGeneratedUsername;
-    }
+    public string GetCurrentUsername() => currentSystemGeneratedUsername;
+    public string GetSavedUsername() => savedUsername;
     
-    /// <summary>
-    /// Get the saved username after update
-    /// </summary>
-    public string GetSavedUsername()
-    {
-        return savedUsername;
-    }
-    
-    /// <summary>
-    /// Set custom username programmatically
-    /// </summary>
     public bool SetCustomUsername(string username)
     {
-        if (string.IsNullOrEmpty(username))
-            return false;
+        if (string.IsNullOrWhiteSpace(username)) return false;
+
+        username = username.Trim();
         
-        if (usernameGenerator.IsUsernameTaken(username))
-            return false;
+        if (usernameGenerator.IsUsernameTaken(username)) return false;
         
         currentSystemGeneratedUsername = username;
         originalUsername = username;
@@ -573,10 +346,6 @@ public class GuestLoginManager : MonoBehaviour
             usernameInputField.text = currentSystemGeneratedUsername;
         
         SetUpdateButtonState(false);
-        // Persist custom username
-        PlayerPrefs.SetString("LastGuestUsername", currentSystemGeneratedUsername);
-        PlayerPrefs.SetString("LastLoginMethod", "Guest");
-        PlayerPrefs.Save();
         return true;
     }
 }

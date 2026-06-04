@@ -107,6 +107,12 @@ public class PlayerData : MonoBehaviour
 
     public void ChangePlayerName(string name)
     {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Debug.LogWarning("[PlayerData] Ignoring empty player name change.");
+            return;
+        }
+
         playerName = name;
         NotifyDataChanged();
         SavePlayerDataAndSyncCloud();
@@ -135,6 +141,11 @@ public class PlayerData : MonoBehaviour
     public void SavePlayerData()
     {
         if (isLoggingOut) return;
+        if (string.IsNullOrWhiteSpace(playerName))
+        {
+            Debug.LogWarning("[PlayerData] Skipping local save because playerName is empty.");
+            return;
+        }
 
         data = BuildSaveData();
 
@@ -157,6 +168,24 @@ public class PlayerData : MonoBehaviour
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(data.playerName))
+        {
+            Debug.LogWarning("[PlayerData] Local save has an empty player name — ignoring invalid file.");
+            try
+            {
+                File.Delete(playerDataJsonFilePath);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayerData] Failed to delete invalid save file: {e.Message}");
+            }
+
+            Reset();
+            playerName = string.Empty;
+            lastSavedLevel = level;
+            return;
+        }
+
         ApplySaveData(data);
         Debug.Log($"[PlayerData] Loaded from disk — name='{playerName}', level={level}");
     }
@@ -164,12 +193,13 @@ public class PlayerData : MonoBehaviour
     public async Task SavePlayerDataToCloud()
     {
         if (isLoggingOut) return;
+        if (string.IsNullOrWhiteSpace(playerName)) return;
         if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (!AuthenticationService.Instance.IsSignedIn) return;
         if (PlayerPrefs.GetInt("PlayerSignedIn", 0) != 1) return;
 
         PlayerDataSaver snapshot = BuildSaveData();
-      //  await CloudSaver.SaveDataToCloud("playerData", snapshot);
+        //  await CloudSaver.SaveDataToCloud("playerData", snapshot);
         await CloudSaver2.SaveData("playerData", snapshot); // Optional second cloud save for redundancy
 
         Debug.Log($"[PlayerData] Cloud saved — name='{snapshot.playerName}', level={snapshot.level}");
@@ -179,7 +209,7 @@ public class PlayerData : MonoBehaviour
     {
         try
         {
-           // string json2 = await CloudSaver.LoadDataFromCloud("playerData");
+            // string json2 = await CloudSaver.LoadDataFromCloud("playerData");
             string json = await CloudSaver2.LoadData("playerData"); // Optional second cloud load for redundancy
 
             if (string.IsNullOrEmpty(json))
@@ -216,6 +246,7 @@ public class PlayerData : MonoBehaviour
         SavePlayerData();
 
         if (isLoggingOut) return;
+        if (string.IsNullOrWhiteSpace(playerName)) return;
         if (UnityServices.State != ServicesInitializationState.Initialized) return;
         if (!AuthenticationService.Instance.IsSignedIn) return;
 
@@ -259,5 +290,28 @@ public class PlayerData : MonoBehaviour
     private void NotifyDataChanged()
     {
         onPlayerDataChanged?.Invoke();
+    }
+    /// <summary>
+    /// Resets player data to new game state (fresh start)
+    /// </summary>
+    public void ResetToNewGame()
+    {
+        level = 1;
+        health = 100;
+        attack = 10;
+        defense = 5;
+        gold = 0;
+        attackSpeed = 2;
+        movementSpeed = 6;
+
+        healthBuff = 0;
+        attackBuff = 0;
+        defenseBuff = 0;
+        cooldownBuff = 0;
+        movementSpeedBuff = 0;
+
+        lastSavedLevel = level;
+
+        Debug.Log("[NewGame] Player data reset to new game state.");
     }
 }

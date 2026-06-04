@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class OneTimePanelAccess : MonoBehaviour
+public class OneTimeAccess : MonoBehaviour
 {
     public GameObject panel;
     public string itemClaimedKey = "ItemClaimed";
@@ -8,13 +8,12 @@ public class OneTimePanelAccess : MonoBehaviour
 
     void Start()
     {
-        if (ShouldSkipForScene1SignIn())
+        if (IsSignedInPlayer())
         {
             gameObject.SetActive(false);
             return;
         }
 
-        // If already claimed, disable this object so it can't trigger again
         if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 1)
         {
             gameObject.SetActive(false);
@@ -23,8 +22,7 @@ public class OneTimePanelAccess : MonoBehaviour
 
     public void ShowPanel()
     {
-        if (ShouldSkipForScene1SignIn())
-            return;
+        if (IsSignedInPlayer()) return;
 
         if (PlayerPrefs.GetInt(itemClaimedKey, 0) == 0)
         {
@@ -34,36 +32,26 @@ public class OneTimePanelAccess : MonoBehaviour
 
     public void ClaimItem()
     {
-        // Persist the claim
         PlayerPrefs.SetInt(itemClaimedKey, 1);
         PlayerPrefs.Save();
 
-        // Close the panel
         panel.SetActive(false);
 
-        // Find and hide all matching treasure chests in the scene
         Treasure[] treasures = FindObjectsOfType<Treasure>(true);
         foreach (Treasure treasure in treasures)
         {
             if (treasure != null && treasure.UsesClaimKey(itemClaimedKey))
-            {
                 treasure.gameObject.SetActive(false);
-            }
         }
 
-        // Disable self so this panel can never trigger again this session
         gameObject.SetActive(false);
-
         Debug.Log("Item claimed and panel closed.");
     }
 
-    private bool ShouldSkipForScene1SignIn()
+    // Only suppress for real signed-in accounts — guests still see the panel
+    private bool IsSignedInPlayer()
     {
-        if (PlayerPrefs.GetInt(Scene1SignedInKey, 0) != 1)
-            return false;
-
-        PlayerPrefs.DeleteKey(Scene1SignedInKey);
-        PlayerPrefs.Save();
-        return true;
+        if (AuthManager.Instance == null) return false;
+        return AuthManager.Instance.IsSignedIn && !AuthManager.Instance.IsGuest;
     }
 }

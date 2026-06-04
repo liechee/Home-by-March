@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class LoginForm : MonoBehaviour
 {
@@ -13,7 +14,6 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private TMP_Text welcomeText;
 
     [Header("Login Panel")]
-   // [SerializeField] private GameObject      loginPanel;
     [SerializeField] private TMP_InputField  usernameInputField;
     [SerializeField] private TMP_InputField  passwordInputField;
     [SerializeField] private Button          signInButton;
@@ -26,10 +26,8 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private Image  eyeIconImage;
 
     [Header("Scene Loading")]
-    [SerializeField] private string mainScreenSceneName    = "Main Screen";
-    [SerializeField] private string loadingScreenSceneName = "Loading Screen 1";
-    [SerializeField] private string signUpSceneName        = "SignUpScene";
-    [SerializeField] private float  loadingScreenDuration  = 2f;
+    [SerializeField] private string mainScreenSceneName = "Main Screen";
+    [SerializeField] private string signUpSceneName     = "SignUpScene";
 
     // ── Private state ─────────────────────────────────────────────────────────
 
@@ -37,7 +35,7 @@ public class LoginForm : MonoBehaviour
     private string currentGuestUsername;
     private bool   isProcessing;
     private bool   isPasswordVisible;
-    private bool   isLoadingScene;  // Prevent duplicate scene loading
+    private bool   isLoadingScene;
     private PlayerData playerData;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
@@ -56,17 +54,12 @@ public class LoginForm : MonoBehaviour
 
     private void Start()
     {
-        // Resolve the current PlayerData reference if one is already live.
         FindPlayerData();
-        
         SetupPasswordToggle();
         SetupButtons();
 
-        // Hide everything until auth state is known.
-       // loginPanel?.SetActive(false);
         isLoadingScene = false;
 
-        // Re-subscribe in case OnEnable fired before AuthManager.Awake completed.
         if (AuthManager.Instance != null)
         {
             AuthManager.Instance.OnStateChanged -= OnAuthStateChanged;
@@ -91,9 +84,7 @@ public class LoginForm : MonoBehaviour
         }
 
         if (playerData == null)
-        {
             FindPlayerData();
-        }
 
         resolvedPlayerData = playerData;
         return resolvedPlayerData != null;
@@ -101,10 +92,6 @@ public class LoginForm : MonoBehaviour
 
     // ── Auth-ready coroutine ──────────────────────────────────────────────────
 
-    /// <summary>
-    /// Polls until AuthManager.IsReady, then fires an initial UI refresh.
-    /// Handles the race between this MonoBehaviour's Start and AuthManager's async init.
-    /// </summary>
     private IEnumerator WaitForAuthThenRefresh()
     {
         const float kTimeout = 10f;
@@ -123,19 +110,12 @@ public class LoginForm : MonoBehaviour
         OnAuthStateChanged();
     }
 
-    /// <summary>
-    /// Syncs the player name from login username to PlayerData
-    /// </summary>
     private void SyncPlayerDataName(string username)
     {
-        if (string.IsNullOrEmpty(username))
-        {
-            return;
-        }
+        if (string.IsNullOrEmpty(username)) return;
 
         if (TryGetPlayerData(out var resolvedPlayerData))
         {
-            // Use PlayerData API so it triggers change notifications and saves properly
             resolvedPlayerData.ChangePlayerName(username);
             Debug.Log($"[LoginForm] Synced player name to PlayerData: {username}");
         }
@@ -147,32 +127,35 @@ public class LoginForm : MonoBehaviour
     {
         if (AuthManager.Instance == null) return;
 
-        if (AuthManager.Instance.IsSignedIn)
+        if (AuthManager.Instance.IsSignedIn && !AuthManager.Instance.IsInteractiveAuthInProgress)
         {
-            // Session was restored or sign-in succeeded
             string name = AuthManager.Instance.CloudUsername
                           ?? AuthManager.Instance.GuestName
-                          ?? PlayerPrefs.GetString("LastSignedInPlayer", "Player");
+                          ?? AuthManager.Instance.CurrentPlayerData?.playerName;
 
-            // Sync the name to PlayerData
-            SyncPlayerDataName(name);
+            bool isExplicitGuestLogin = PlayerPrefs.GetString("LastLoginMethod", string.Empty) == "Guest"
+                                        && !string.IsNullOrWhiteSpace(AuthManager.Instance.GuestName);
+            bool isExplicitAccountLogin = PlayerPrefs.GetInt(AuthManager.PrefPlayerSignedIn, 0) == 1
+                                          && !string.IsNullOrWhiteSpace(name);
 
-            ShowWelcomeMessage($"Welcome back, {name}!");
-           // loginPanel?.SetActive(false);
-
-            // Only load main screen if we're not already loading and not already in main scene
-            if (!isLoadingScene && !IsInMainScene())
+            if (string.IsNullOrWhiteSpace(name) || (!isExplicitGuestLogin && !isExplicitAccountLogin))
             {
-                StartCoroutine(LoadMainScreen());
+                Debug.LogWarning("[LoginForm] No explicit login state or valid player name. Staying on login screen.");
+                ShowWelcomeMessage("");
+                isProcessing = false;
+                SetButtonsInteractable(true);
+                return;
             }
+
+            SyncPlayerDataName(name);
+            ShowWelcomeMessage($"Welcome back, {name}!");
+
+            if (!isLoadingScene && !IsInMainScene())
+                LoadMainScreen();
         }
         else
         {
-            // No session — show login panel
-            //loginPanel?.SetActive(true);
             ShowWelcomeMessage("");
-
-            // Reset processing flag when showing login form
             isProcessing = false;
             SetButtonsInteractable(true);
         }
@@ -182,8 +165,7 @@ public class LoginForm : MonoBehaviour
 
     private bool IsInMainScene()
     {
-        string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-        return currentScene == mainScreenSceneName;
+        return SceneManager.GetActiveScene().name == mainScreenSceneName;
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -207,16 +189,6 @@ public class LoginForm : MonoBehaviour
         UpdateEyeIcon();
     }
 
-    private void SetupGuestGenerator()
-    {
-        usernameGenerator = FindObjectOfType<GuestUsernameGenerator>();
-        if (usernameGenerator == null)
-        {
-            GameObject go = new GameObject("GuestUsernameGenerator");
-            usernameGenerator = go.AddComponent<GuestUsernameGenerator>();
-        }
-    }
-
     // ── Sign in ───────────────────────────────────────────────────────────────
 
     private async void OnSignInClicked()
@@ -236,12 +208,11 @@ public class LoginForm : MonoBehaviour
         SetButtonsInteractable(false);
         ShowStatusMessage("Signing in…", false);
 
-        // ✅ IMPORTANT: Sign out any existing session before attempting to sign in
         if (AuthManager.Instance.IsSignedIn)
         {
             Debug.Log("[LoginForm] Existing session detected. Signing out before new sign in.");
             AuthManager.Instance.SignOut();
-            await Task.Delay(100); // Wait a moment for sign out to complete
+            await Task.Delay(100);
         }
 
         AuthResult result = await AuthManager.Instance.SignInAsync(username, password);
@@ -249,7 +220,6 @@ public class LoginForm : MonoBehaviour
         if (result.IsSuccess)
         {
             ShowStatusMessage("Sign in successful!", false);
-            // OnAuthStateChanged will fire and load the main screen
         }
         else
         {
@@ -264,16 +234,15 @@ public class LoginForm : MonoBehaviour
     private void OnSignUpClicked()
     {
         if (isLoadingScene) return;
-        
-        // Sign out any existing session before going to sign-up
+
         if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
         {
             Debug.Log("[LoginForm] Signing out existing session before sign-up.");
             AuthManager.Instance.SignOut();
         }
-        
+
         if (!string.IsNullOrEmpty(signUpSceneName))
-            UnityEngine.SceneManagement.SceneManager.LoadScene(signUpSceneName);
+            SceneManager.LoadScene(signUpSceneName);
         else
             Debug.LogError("[LoginForm] Sign-up scene name not set!");
     }
@@ -298,63 +267,21 @@ public class LoginForm : MonoBehaviour
     private void UpdateEyeIcon()
     {
         if (eyeIconImage == null) return;
-        if (isPasswordVisible  && eyeOpenSprite  != null) eyeIconImage.sprite = eyeOpenSprite;
-        if (!isPasswordVisible && eyeClosedSprite != null) eyeIconImage.sprite = eyeClosedSprite;
+        if (isPasswordVisible  && eyeOpenSprite   != null) eyeIconImage.sprite = eyeOpenSprite;
+        if (!isPasswordVisible && eyeClosedSprite  != null) eyeIconImage.sprite = eyeClosedSprite;
     }
 
     // ── Scene loading ─────────────────────────────────────────────────────────
 
-    private IEnumerator LoadMainScreen()
+    private void LoadMainScreen()
     {
-        if (isLoadingScene) yield break;
-        
+        if (isLoadingScene) return;
         isLoadingScene = true;
+
         ShowStatusMessage("Loading game…", false);
+        Debug.Log($"[LoginForm] Loading main screen: '{mainScreenSceneName}'");
 
-        if (!string.IsNullOrEmpty(loadingScreenSceneName))
-        {
-            yield return StartCoroutine(LoadSceneAsync(loadingScreenSceneName));
-            yield return new WaitForSeconds(loadingScreenDuration);
-        }
-
-        yield return StartCoroutine(LoadSceneAsync(mainScreenSceneName));
-        
-        isProcessing = false;
-        isLoadingScene = false;
-    }
-
-    private IEnumerator LoadSceneAsync(string sceneName)
-    {
-        if (string.IsNullOrEmpty(sceneName)) 
-        { 
-            Debug.LogError("[LoginForm] Scene name is empty!"); 
-            yield break; 
-        }
-        
-        if (!IsSceneValid(sceneName))        
-        { 
-            Debug.LogError($"[LoginForm] Scene '{sceneName}' not in build settings!"); 
-            yield break; 
-        }
-
-        AsyncOperation op = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(sceneName);
-        while (!op.isDone)
-        {
-            Debug.Log($"[LoginForm] Loading '{sceneName}': {Mathf.Clamp01(op.progress / 0.9f) * 100:0}%");
-            yield return null;
-        }
-    }
-
-    private static bool IsSceneValid(string sceneName)
-    {
-        int count = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
-        for (int i = 0; i < count; i++)
-        {
-            string path = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
-            if (System.IO.Path.GetFileNameWithoutExtension(path) == sceneName)
-                return true;
-        }
-        return false;
+        SceneManager.LoadScene(mainScreenSceneName);
     }
 
     // ── UI helpers ────────────────────────────────────────────────────────────
@@ -379,12 +306,8 @@ public class LoginForm : MonoBehaviour
     private IEnumerator ClearStatusAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (statusText != null && statusText.text != null)
-        {
-            // Only clear if it's not a welcome message
-            if (!statusText.text.Contains("Welcome"))
-                statusText.text = "";
-        }
+        if (statusText != null && !statusText.text.Contains("Welcome"))
+            statusText.text = "";
     }
 
     private void SetButtonsInteractable(bool interactable)

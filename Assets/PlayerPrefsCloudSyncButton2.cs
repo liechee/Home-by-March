@@ -14,7 +14,7 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
     private string cachedPlayerId;
     private string cachedPlayerIdKey = "CachedPlayerId";
 
-    void Awake()
+    async void Awake()
     {
         overallStepCounter = FindObjectOfType<OverallStepCounter>();
         playerData         = FindObjectOfType<PlayerData>();
@@ -24,11 +24,22 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
         if (dailyRewardsWindow == null) Debug.LogWarning("[CloudSync] DailyRewardsWindow not found!");
         if (inventory          == null) Debug.LogWarning("[CloudSync] Inventory not found!");
         if (inventory2         == null) Debug.LogWarning("[CloudSync] Inventory2 not found!");
-        
-        // Subscribe to AuthManager events
+
         if (AuthManager.Instance != null)
         {
             AuthManager.Instance.OnStateChanged += OnAuthStateChanged;
+
+            // If sign-in already happened before this scene loaded (e.g. logged in from
+            // the Login Scene), OnStateChanged won't fire again — so load non-step data
+            // here manually. Step data is intentionally skipped: OverallStepCounter.Start()
+            // calls LoadStepDataFromCloud() itself, and calling it again here would race
+            // against that and cause a double-load / display showing 0.
+            if (IsPlayerSignedIn() && PlayerPrefs.GetString("LastLoginMethod", "") == "UsernamePassword")
+            {
+                Debug.Log("[CloudSync] Awake: already signed in on scene load — loading non-step cloud data.");
+                cachedPlayerId = null;
+                await LoadNonStepDataFromCloud();
+            }
         }
     }
 
@@ -40,15 +51,16 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
         }
     }
 
-    private void OnAuthStateChanged()
+    private async void OnAuthStateChanged()
     {
         // Clear cached player ID when auth state changes
         cachedPlayerId = null;
         
-        // If signed in, cache the new player ID
+        // If signed in, cache the new player ID and refresh cloud-backed PlayerPrefs.
         if (IsPlayerSignedIn())
         {
             GetCurrentPlayerId();
+            await LoadFromCloudAsync();
         }
     }
 
@@ -97,8 +109,13 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
 
         if (overallStepCounter != null)
         {
+            Debug.Log("[CloudSync] Requesting step data load from OverallStepCounter...");
             await overallStepCounter.LoadStepDataFromCloud();
             Debug.Log("[CloudSync] Step data load requested.");
+        }
+        else
+        {
+            Debug.LogWarning("[CloudSync] Step data load skipped — OverallStepCounter not found.");
         }
 
         Debug.Log("[CloudSync] ── LoadFromCloud complete ──────────────────────");
@@ -191,13 +208,17 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
     /// </summary>
     private bool IsPlayerSignedIn()
     {
+        if (AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn)
+        {
+            return true;
+        }
+
         if (AuthManager.Instance != null)
         {
-            return AuthManager.Instance.IsSignedIn || AuthManager.Instance.IsGuest;
+            return AuthManager.Instance.IsSignedIn;
         }
-        
-        // Fallback to PlayerPrefs
-        return PlayerPrefs.GetInt("PlayerSignedIn", 0) == 1;
+
+        return false;
     }
 
     private async Task SaveNonStepDataToCloud()
@@ -211,8 +232,15 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
         string playerId = GetCurrentPlayerId();
         Debug.Log($"[CloudSync] Saving data for Player ID: {playerId}");
 
-        await PlayerPrefsCloudSync2.SaveAllToCloud();
-        Debug.Log("[CloudSync] PlayerPrefs saved.");
+        int savedPrefsCount = await PlayerPrefsCloudSync2.SaveAllToCloud();
+        if (savedPrefsCount > 0)
+        {
+            Debug.Log($"[CloudSync] PlayerPrefs saved ({savedPrefsCount} keys).");
+        }
+        else
+        {
+            Debug.Log("[CloudSync] PlayerPrefs save skipped (no tracked keys or save failed).");
+        }
 
         if (playerData != null)
         {
@@ -297,12 +325,14 @@ public class PlayerPrefsCloudSyncButton2 : MonoBehaviour
             Debug.LogWarning($"[CloudSync] {caller} blocked — logout in progress.");
             return false;
         }
-        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1)
+        bool activeSession = IsPlayerSignedIn();
+
+        if (PlayerPrefs.GetInt("HasLoggedOut", 0) == 1 && !activeSession)
         {
             Debug.LogWarning($"[CloudSync] {caller} blocked — post-logout state.");
             return false;
         }
-        if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1)
+        if (PlayerPrefs.GetInt("SuppressCloudRestore", 0) == 1 && !activeSession)
         {
             Debug.LogWarning($"[CloudSync] {caller} blocked — cloud restore suppressed.");
             return false;

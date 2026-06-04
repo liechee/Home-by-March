@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Services.CloudSave;
+using Unity.Services.Core;
 using System.Threading.Tasks;
 using System;
 using Unity.Services.Authentication;
+using System.Globalization;
 
 [System.Serializable]
 public class PlayerPrefsData2
@@ -22,60 +24,81 @@ public static class PlayerPrefsCloudSync2
     private static readonly List<(string key, string type)> TrackedKeys = new()
     {
         // Rewards
+        ("RewardClaimed", "int"),
         ("RewardClaimed_0", "int"),
         ("RewardClaimed_1", "int"),
         ("RewardClaimed_2", "int"),
+        ("firstRewards", "int"),
 
         // Shards
-        ("ShardCollected_0","int"),
+        ("ShardCollected_0", "int"),
         ("ShardCollected_1", "int"),
         ("ShardCollected_2", "int"),
+        ("ShardCollected_3", "int"),
+        ("ShardCollected_4", "int"),
+        ("ShardCollected_5", "int"),
+        ("ShardCollected_6", "int"),
+        ("ShardCollected_7", "int"),
+        ("ShardCollected_8", "int"),
 
         // Dungeons
-        ("DungeonComplete_0","int"),
-        ("DungeonComplete_1","int"),
-        ("DungeonComplete_2","int"),
+        ("DungeonComplete_0", "int"),
+        ("DungeonComplete_1", "int"),
+        ("DungeonComplete_2", "int"),
+        ("DungeonComplete_3", "int"),
+        ("DungeonComplete_4", "int"),
+        ("DungeonComplete_5", "int"),
+        ("DungeonComplete_6", "int"),
+        ("DungeonComplete_7", "int"),
+        ("DungeonComplete_8", "int"),
 
         // Player
         ("PlayerGold", "int"),
         ("PlayerLevel", "int"),
-        ("ItemClaimed",  "int"),
+        ("ItemClaimed", "int"),
 
         // Story
         ("StoryCompleted_0", "int"),
         ("StoryCompleted_1", "int"),
         ("StoryCompleted_2", "int"),
         ("StoryCompleted_3", "int"),
+        ("StoryCompleted_4", "int"),
+        ("StoryCompleted_5", "int"),
+        ("StoryCompleted_6", "int"),
+        ("StoryCompleted_7", "int"),
+        ("StoryCompleted_8", "int"),
+
+        // Settings
+        ("MusicVolume", "float"),
+        ("SFXVolume", "float"),
     };
 
 
-    public static async Task SaveAllToCloud()
+    public static async Task<int> SaveAllToCloud()
     {
         if (!IsSignedIn())
         {
             Debug.LogWarning("[PlayerPrefsCloudSync] SaveAllToCloud skipped — not signed in.");
-            return;
+            return 0;
         }
 
-        var data = new PlayerPrefsData();
+        var data = new PlayerPrefsData2();
 
         foreach (var (key, type) in TrackedKeys)
         {
-            if (!PlayerPrefs.HasKey(key)) continue;
-
             try
             {
                 switch (type)
                 {
                     case "int":
                         data.keys.Add(key);
-                        data.values.Add(PlayerPrefs.GetInt(key).ToString());
+                        data.values.Add(PlayerPrefs.GetInt(key, 0).ToString());
                         data.types.Add("int");
                         break;
 
                     case "float":
                         data.keys.Add(key);
-                        data.values.Add(PlayerPrefs.GetFloat(key).ToString("R"));
+                        data.values.Add(PlayerPrefs.GetFloat(key, 0f).ToString("R", CultureInfo.InvariantCulture));
                         data.types.Add("float");
                         break;
 
@@ -99,8 +122,7 @@ public static class PlayerPrefsCloudSync2
 
         if (data.keys.Count == 0)
         {
-            Debug.LogWarning("[PlayerPrefsCloudSync] SaveAllToCloud skipped — payload is empty (no tracked PlayerPrefs keys).");
-            return;
+            return 0;
         }
 
         string json = JsonUtility.ToJson(data);
@@ -110,10 +132,12 @@ public static class PlayerPrefsCloudSync2
         {
             await CloudSaveService.Instance.Data.Player.SaveAsync(cloudData);
             Debug.Log($"[PlayerPrefsCloudSync] Saved {data.keys.Count} keys to cloud.");
+            return data.keys.Count;
         }
         catch (Exception e)
         {
             Debug.LogError("[PlayerPrefsCloudSync] Cloud save failed: " + e);
+            return 0;
         }
     }
 
@@ -138,7 +162,7 @@ public static class PlayerPrefsCloudSync2
             }
 
             string json = item.Value.GetAsString();
-            PlayerPrefsData data = JsonUtility.FromJson<PlayerPrefsData>(json);
+            PlayerPrefsData2 data = JsonUtility.FromJson<PlayerPrefsData2>(json);
 
             if (data == null || data.keys == null)
             {
@@ -167,7 +191,7 @@ public static class PlayerPrefsCloudSync2
                             PlayerPrefs.SetInt(key, int.Parse(value));
                             break;
                         case "float":
-                            PlayerPrefs.SetFloat(key, float.Parse(value));
+                            PlayerPrefs.SetFloat(key, float.Parse(value, CultureInfo.InvariantCulture));
                             break;
                         case "string":
                             PlayerPrefs.SetString(key, value);
@@ -196,13 +220,18 @@ public static class PlayerPrefsCloudSync2
     }
 
     private static bool IsSignedIn(){
-       
-       if (AuthManager.Instance != null)
+        if (UnityServices.State == ServicesInitializationState.Initialized &&
+            AuthenticationService.Instance != null &&
+            AuthenticationService.Instance.IsSignedIn)
         {
-            return AuthManager.Instance.IsSignedIn || AuthManager.Instance.IsGuest;
+            return true;
         }
-        
-        // Fallback to PlayerPrefs
+
+        if (AuthManager.Instance != null)
+        {
+            return AuthManager.Instance.IsSignedIn;
+        }
+
         return PlayerPrefs.GetInt("PlayerSignedIn", 0) == 1;
     }
 }

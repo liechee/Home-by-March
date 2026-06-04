@@ -44,6 +44,7 @@ public class AuthManager : MonoBehaviour
 
     /// <summary>Fired whenever auth state changes (signed in, signed out, guest, etc.).</summary>
     public event Action OnStateChanged;
+    public Action OnSignedIn;
 
     /// <summary>Fired when player data is loaded from cloud.</summary>
     public event Action OnPlayerDataLoaded;
@@ -54,8 +55,9 @@ public class AuthManager : MonoBehaviour
     // ── Public state ──────────────────────────────────────────────────────────
 
     public bool IsReady { get; private set; }
+    public bool IsInteractiveAuthInProgress { get; private set; }
     public bool IsSignedIn => AuthenticationService.Instance?.IsSignedIn ?? false;
-    public bool IsGuest => !string.IsNullOrEmpty(GuestName) && !IsSignedIn;
+    public bool IsGuest => !string.IsNullOrEmpty(GuestName) || PlayerPrefs.GetString("LastLoginMethod", string.Empty) == "Guest";
     public string GuestName { get; private set; }
 
     /// <summary>Cloud-loaded username (null until LoadProfileFromCloud completes).</summary>
@@ -91,6 +93,63 @@ public class AuthManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns a live PlayerData reference if one is currently available.
+    /// Rebinds the cached reference after scene changes before the caller uses it.
+    /// </summary>
+    private bool TryGetLivePlayerData(out PlayerData playerData)
+    {
+        if (CurrentPlayerData == null)
+        {
+            FindPlayerData();
+        }
+
+        playerData = CurrentPlayerData;
+        return playerData != null;
+    }
+
+    private void ClearFailedAuthState()
+    {
+        IsInteractiveAuthInProgress = false;
+
+        GuestName = null;
+        CloudUsername = null;
+
+        if (AuthenticationService.Instance != null)
+        {
+            if (AuthenticationService.Instance.IsSignedIn)
+            {
+                AuthenticationService.Instance.SignOut();
+            }
+
+            AuthenticationService.Instance.ClearSessionToken();
+        }
+
+        PlayerPrefs.DeleteKey(PrefPlayerSignedIn);
+        PlayerPrefs.DeleteKey("LastSignedInPlayer");
+        PlayerPrefs.DeleteKey("LastLoginMethod");
+        PlayerPrefs.DeleteKey("LastGuestUsername");
+        PlayerPrefs.Save();
+
+        OnStateChanged?.Invoke();
+    }
+
+    private static void ClearRestoreBlockers()
+    {
+        PlayerPrefs.DeleteKey("HasLoggedOut");
+        PlayerPrefs.DeleteKey("SuppressCloudRestore");
+        PlayerPrefs.Save();
+    }
+
+    private static void UnlockStepCloudRestore()
+    {
+        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        if (stepCounter != null && stepCounter.isLoggingOut)
+        {
+            stepCounter.isLoggingOut = false;
+        }
+    }
+
     // ── Initialization ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -118,6 +177,7 @@ public class AuthManager : MonoBehaviour
         finally
         {
             IsReady = true;
+            await Task.Yield();
             OnStateChanged?.Invoke();
         }
     }
@@ -144,6 +204,14 @@ public class AuthManager : MonoBehaviour
 
             // Load the cloud profile so CloudUsername is populated.
             await LoadProfileFromCloud();
+            
+            // Restore guest name if this is a guest session
+            string lastLoginMethod = PlayerPrefs.GetString("LastLoginMethod", string.Empty);
+            if (lastLoginMethod == "Guest")
+            {
+                GuestName = PlayerPrefs.GetString("LastGuestUsername", string.Empty);
+                Debug.Log($"[AuthManager] Guest session restored: {GuestName}");
+            }
             
             // Load player data to PlayerData component
             await LoadPlayerDataToPlayerData();
@@ -204,12 +272,18 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public async Task<AuthResult> SignInAsync(string username, string password)
     {
+        IsInteractiveAuthInProgress = true;
+
         try
         {
             // Ensure any existing guest session is cleared
             GuestName = null;
+            PlayerPrefs.DeleteKey("LastGuestUsername");
             
             await AuthenticationService.Instance.SignInWithUsernamePasswordAsync(username, password);
+
+            ClearRestoreBlockers();
+            UnlockStepCloudRestore();
 
             // Load profile from cloud first to get existing data
             await LoadProfileFromCloud();
@@ -224,28 +298,34 @@ public class AuthManager : MonoBehaviour
             await LoadPlayerDataToPlayerData();
 
             // Update PlayerData name
-            if (CurrentPlayerData != null)
+            if (TryGetLivePlayerData(out var livePlayerData))
             {
-                CurrentPlayerData.ChangePlayerName(username);
+                livePlayerData.ChangePlayerName(username);
             }
 
+            PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
             PlayerPrefs.Save();
 
+            IsInteractiveAuthInProgress = false;
             OnStateChanged?.Invoke();
+            OnSignedIn?.Invoke();
             return AuthResult.Success();
         }
         catch (AuthenticationException ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail(MapSignInError(ex.ErrorCode, ex.Message));
         }
         catch (RequestFailedException ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail(MapRequestError(ex.ErrorCode, ex.Message));
         }
         catch (Exception ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail($"Sign in failed: {ex.Message}");
         }
     }
@@ -258,6 +338,8 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public async Task<AuthResult> SignUpAsync(string username, string password)
     {
+        IsInteractiveAuthInProgress = true;
+
         try
         {
             // Ensure no stale session interferes.
@@ -270,35 +352,45 @@ public class AuthManager : MonoBehaviour
             // Clear guest data
             GuestName = null;
             CloudUsername = null;
+            PlayerPrefs.DeleteKey("LastGuestUsername");
 
             await AuthenticationService.Instance.SignUpWithUsernamePasswordAsync(username, password);
+
+            ClearRestoreBlockers();
+            UnlockStepCloudRestore();
 
             await SaveProfileToCloud(username, "UsernamePassword");
             
             // Update PlayerData with username
-            if (CurrentPlayerData != null)
+            if (TryGetLivePlayerData(out var livePlayerData))
             {
-                CurrentPlayerData.ChangePlayerName(username);
+                livePlayerData.ChangePlayerName(username);
                 await SavePlayerDataToCloud();
             }
 
+            PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
             PlayerPrefs.Save();
 
+            IsInteractiveAuthInProgress = false;
             OnStateChanged?.Invoke();
+            OnSignedIn?.Invoke();
             return AuthResult.Success();
         }
         catch (AuthenticationException ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail(MapSignUpError(ex.ErrorCode, ex.Message));
         }
         catch (RequestFailedException ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail(MapSignUpRequestError(ex.ErrorCode, ex.Message));
         }
         catch (Exception ex)
         {
+            ClearFailedAuthState();
             return AuthResult.Fail($"Registration failed: {ex.Message}");
         }
     }
@@ -311,23 +403,45 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public async Task<AuthResult> UpgradeGuestToAccountAsync(string username, string password)
     {
+        IsInteractiveAuthInProgress = true;
+
         if (!AuthenticationService.Instance.IsSignedIn)
-            return AuthResult.Fail("No active session to upgrade. Please log in first.");
+        {
+            // If we have a recorded guest identity, try to (re)establish an anonymous session
+            // so we can link the new username+password to the existing guest data.
+            if (!string.IsNullOrEmpty(GuestName) || PlayerPrefs.GetString("LastLoginMethod", string.Empty) == "Guest")
+            {
+                try
+                {
+                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                    ClearRestoreBlockers();
+                    UnlockStepCloudRestore();
+                }
+                catch (Exception ex)
+                {
+                    return AuthResult.Fail($"No active session to upgrade. Failed to restore guest session: {ex.Message}");
+                }
+            }
+            else
+            {
+                return AuthResult.Fail("No active session to upgrade. Please log in first.");
+            }
+        }
 
         try
         {
-            // Save current PlayerData before upgrade
-            var currentPlayerData = CurrentPlayerData;
-            
             await AuthenticationService.Instance.AddUsernamePasswordAsync(username, password);
+
+            ClearRestoreBlockers();
+            UnlockStepCloudRestore();
 
             // Overwrite the cloud profile with the new permanent identity
             await SaveProfileToCloud(username, "UsernamePassword");
             
             // Preserve player data
-            if (currentPlayerData != null && !string.IsNullOrEmpty(currentPlayerData.playerName))
+            if (TryGetLivePlayerData(out var livePlayerData) && !string.IsNullOrEmpty(livePlayerData.playerName))
             {
-                currentPlayerData.ChangePlayerName(username);
+                livePlayerData.ChangePlayerName(username);
                 await SavePlayerDataToCloud();
             }
 
@@ -336,22 +450,28 @@ public class AuthManager : MonoBehaviour
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
             PlayerPrefs.DeleteKey("LastGuestUsername");
+            PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
             PlayerPrefs.Save();
 
             Debug.Log($"[AuthManager] Guest account upgraded to: {username}");
+            IsInteractiveAuthInProgress = false;
             OnStateChanged?.Invoke();
+            OnSignedIn?.Invoke();
             return AuthResult.Success();
         }
         catch (AuthenticationException ex)
         {
+            IsInteractiveAuthInProgress = false;
             return AuthResult.Fail(MapSignUpError(ex.ErrorCode, ex.Message));
         }
         catch (RequestFailedException ex)
         {
+            IsInteractiveAuthInProgress = false;
             return AuthResult.Fail(MapSignUpRequestError(ex.ErrorCode, ex.Message));
         }
         catch (Exception ex)
         {
+            IsInteractiveAuthInProgress = false;
             return AuthResult.Fail($"Account upgrade failed: {ex.Message}");
         }
     }
@@ -364,6 +484,8 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public async Task<AuthResult> SetGuestSessionAsync(string guestUsername)
     {
+        IsInteractiveAuthInProgress = true;
+
         try
         {
             // Clear any existing cloud username
@@ -375,12 +497,15 @@ public class AuthManager : MonoBehaviour
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
             }
 
+            ClearRestoreBlockers();
+            UnlockStepCloudRestore();
+
             GuestName = guestUsername;
             
             // Update PlayerData with guest name
-            if (CurrentPlayerData != null)
+            if (TryGetLivePlayerData(out var livePlayerData))
             {
-                CurrentPlayerData.ChangePlayerName(guestUsername);
+                livePlayerData.ChangePlayerName(guestUsername);
                 await SavePlayerDataToCloud();
             }
             
@@ -389,11 +514,13 @@ public class AuthManager : MonoBehaviour
             // Don't set PrefPlayerSignedIn for guests
             PlayerPrefs.Save();
 
+            IsInteractiveAuthInProgress = false;
             OnStateChanged?.Invoke();
             return AuthResult.Success();
         }
         catch (Exception ex)
         {
+            IsInteractiveAuthInProgress = false;
             return AuthResult.Fail($"Guest login failed: {ex.Message}");
         }
     }
@@ -421,6 +548,8 @@ public class AuthManager : MonoBehaviour
 
         PlayerPrefs.DeleteKey(PrefPlayerSignedIn);
         PlayerPrefs.DeleteKey("LastSignedInPlayer");
+        PlayerPrefs.DeleteKey("LastLoginMethod");
+        PlayerPrefs.DeleteKey("LastGuestUsername");
         PlayerPrefs.Save();
 
         OnStateChanged?.Invoke();
@@ -509,11 +638,10 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public async Task SavePlayerDataToCloud()
     {
-        if (CurrentPlayerData == null)
+        if (!TryGetLivePlayerData(out var livePlayerData))
         {
             Debug.LogWarning("[AuthManager] Cannot save player data — PlayerData is null.");
-            FindPlayerData();
-            if (CurrentPlayerData == null) return;
+            return;
         }
         
         if (!AuthenticationService.Instance.IsSignedIn)
@@ -527,25 +655,25 @@ public class AuthManager : MonoBehaviour
             // Build save data from PlayerData component
             var playerSaveData = new PlayerDataSaver
             {
-                playerName = CurrentPlayerData.playerName,
-                level = CurrentPlayerData.level,
-                health = CurrentPlayerData.health,
-                attack = CurrentPlayerData.attack,
-                defense = CurrentPlayerData.defense,
-                cooldown = CurrentPlayerData.cooldown,
-                movementSpeed = CurrentPlayerData.movementSpeed,
-                gold = CurrentPlayerData.gold,
-                attackSpeed = CurrentPlayerData.attackSpeed
+                playerName = livePlayerData.playerName,
+                level = livePlayerData.level,
+                health = livePlayerData.health,
+                attack = livePlayerData.attack,
+                defense = livePlayerData.defense,
+                cooldown = livePlayerData.cooldown,
+                movementSpeed = livePlayerData.movementSpeed,
+                gold = livePlayerData.gold,
+                attackSpeed = livePlayerData.attackSpeed
             };
 
             var data = new Dictionary<string, object>
             {
-                { CloudKeyPlayerData, JsonUtility.ToJson(playerSaveData) }
+                { CloudKeyPlayerData, playerSaveData }
             };
 
             await CloudSaveService.Instance.Data.Player.SaveAsync(data);
             
-            Debug.Log($"[AuthManager] PlayerData saved to cloud for: {CurrentPlayerData.playerName} (Level: {CurrentPlayerData.level}, Gold: {CurrentPlayerData.gold})");
+            Debug.Log($"[AuthManager] PlayerData saved to cloud for: {livePlayerData.playerName} (Level: {livePlayerData.level}, Gold: {livePlayerData.gold})");
             OnPlayerDataSaved?.Invoke();
         }
         catch (Exception ex)
@@ -565,11 +693,10 @@ public class AuthManager : MonoBehaviour
             return;
         }
 
-        if (CurrentPlayerData == null)
+        if (!TryGetLivePlayerData(out var livePlayerData))
         {
             Debug.LogWarning("[AuthManager] Cannot load player data — PlayerData component not found.");
-            FindPlayerData();
-            if (CurrentPlayerData == null) return;
+            return;
         }
 
         try
@@ -579,31 +706,39 @@ public class AuthManager : MonoBehaviour
 
             if (result.TryGetValue(CloudKeyPlayerData, out var dataItem) && dataItem.Value != null)
             {
-                string jsonData = dataItem.Value.GetAs<string>();
-                if (!string.IsNullOrEmpty(jsonData))
+                PlayerDataSaver loadedData = null;
+
+                try
                 {
-                    var loadedData = JsonUtility.FromJson<PlayerDataSaver>(jsonData);
-                    
-                    if (loadedData != null)
+                    loadedData = dataItem.Value.GetAs<PlayerDataSaver>();
+                }
+                catch (Exception)
+                {
+                    string jsonData = dataItem.Value.GetAs<string>();
+                    if (!string.IsNullOrEmpty(jsonData))
                     {
-                        // Apply loaded data to PlayerData component
-                        CurrentPlayerData.playerName = loadedData.playerName;
-                        CurrentPlayerData.level = loadedData.level;
-                        CurrentPlayerData.health = loadedData.health;
-                        CurrentPlayerData.attack = loadedData.attack;
-                        CurrentPlayerData.defense = loadedData.defense;
-                        CurrentPlayerData.cooldown = loadedData.cooldown;
-                        CurrentPlayerData.movementSpeed = loadedData.movementSpeed;
-                        CurrentPlayerData.gold = loadedData.gold;
-                        CurrentPlayerData.attackSpeed = loadedData.attackSpeed;
-                        
-                        CurrentPlayerData.UpdateCurrentStats();
-                        CurrentPlayerData.SavePlayerData(); // Save to local file
-                        
-                        Debug.Log($"[AuthManager] PlayerData loaded from cloud for: {CurrentPlayerData.playerName} (Level: {CurrentPlayerData.level})");
-                        OnPlayerDataLoaded?.Invoke();
-                        return;
+                        loadedData = JsonUtility.FromJson<PlayerDataSaver>(jsonData);
                     }
+                }
+
+                if (loadedData != null)
+                {
+                    livePlayerData.playerName = loadedData.playerName;
+                    livePlayerData.level = loadedData.level;
+                    livePlayerData.health = loadedData.health;
+                    livePlayerData.attack = loadedData.attack;
+                    livePlayerData.defense = loadedData.defense;
+                    livePlayerData.cooldown = loadedData.cooldown;
+                    livePlayerData.movementSpeed = loadedData.movementSpeed;
+                    livePlayerData.gold = loadedData.gold;
+                    livePlayerData.attackSpeed = loadedData.attackSpeed;
+
+                    livePlayerData.UpdateCurrentStats();
+                    livePlayerData.SavePlayerData(); // Save to local file
+
+                    Debug.Log($"[AuthManager] PlayerData loaded from cloud for: {livePlayerData.playerName} (Level: {livePlayerData.level})");
+                    OnPlayerDataLoaded?.Invoke();
+                    return;
                 }
             }
             

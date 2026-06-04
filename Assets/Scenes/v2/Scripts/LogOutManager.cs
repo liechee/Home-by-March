@@ -61,7 +61,7 @@ public class LogOutManager : MonoBehaviour
         SignOutServices();
 
         // Mark the session as explicitly logged out so Scene1 does not auto-resume.
-        PlayerPrefs.SetInt(AuthManager1.PrefHasLoggedOut, 1);
+        //PlayerPrefs.SetInt(AuthManager.PrefHasLoggedOut, 1);
         PlayerPrefs.Save();
         Debug.Log("[LogOut] Logout flag written.");
 
@@ -137,7 +137,10 @@ public class LogOutManager : MonoBehaviour
             "guestNameDraft.json",
             "playerDailyQuestData.json",
             "optimized_inventory.json",
-            "test.json"
+            "test.json",
+            "equipment.save",
+            "inventory.save",
+
         };
     }
 
@@ -164,6 +167,7 @@ public class LogOutManager : MonoBehaviour
             try
             {
                 inventoryObject.Clear();
+                Debug.Log($"[LogOut] Cleared inventory '{inventoryObject.name}'.");
             }
             catch (Exception e)
             {
@@ -172,4 +176,20 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
+/// <summary>
+/// Resets player data to new game state (fresh start)
+/// </summary>
+public void ResetToNewGame()
+{
+    // Reset all player stats to default values
+    // Add your specific player data reset logic here
+    
+    // Example:
+    // playerLevel = 1;
+    // playerExp = 0;
+    // playerGold = 0;
+    // etc.
+    
+    Debug.Log("[NewGame] Player data reset to new game state.");
+}
 }

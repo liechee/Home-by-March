@@ -1296,7 +1296,7 @@ MonoBehaviour:
   showPasswordButton: {fileID: 628265775}
   eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
-  eyeIconImage: {fileID: 0}
+  eyeIconImage: {fileID: 1422445714}
   mainScreenSceneName: Main Screen
   loadingScreenSceneName: Loading Screen 1
   signUpSceneName: 
@@ -1456,17 +1456,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 509304658}
   m_CullTransparentMesh: 1
---- !u!114 &523591308 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 984468249124528354, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &544486276
 GameObject:
   m_ObjectHideFlags: 0
@@ -3012,17 +3001,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0.82098055}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &902533916 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5285717933429845614, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1018606677
 GameObject:
   m_ObjectHideFlags: 0
@@ -4058,6 +4036,17 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1372783819}
   m_CullTransparentMesh: 1
+--- !u!114 &1422445714 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3637129159644757208, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
+  m_PrefabInstance: {fileID: 944001789114450539}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1429896126
 GameObject:
   m_ObjectHideFlags: 0
@@ -4453,17 +4442,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1455765347}
   m_CullTransparentMesh: 1
---- !u!114 &1532975044 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 996590423855240572, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1549687642
 GameObject:
   m_ObjectHideFlags: 0
@@ -5214,17 +5192,6 @@ MonoBehaviour:
   m_Spacing: {x: 0, y: 55}
   m_Constraint: 0
   m_ConstraintCount: 2
---- !u!114 &1694213818 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 953388245882781426, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1696618265
 GameObject:
   m_ObjectHideFlags: 0
@@ -6145,17 +6112,6 @@ RectTransform:
   m_AnchoredPosition: {x: 1266, y: 585}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1807225547 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 3736677220417079088, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1831527902
 GameObject:
   m_ObjectHideFlags: 0
@@ -6552,17 +6508,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1907176928}
   m_CullTransparentMesh: 1
---- !u!114 &1912017192 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5257885783442336432, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1929775977 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 724439706280574869, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
@@ -6573,29 +6518,6 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 3220553820715523367, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
   m_PrefabInstance: {fileID: 209027551864307723}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1929775979
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1929775977}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b3c9b3b6e227503419c3968bf1b7f210, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  statusText: {fileID: 1912017192}
-  usernameInputField: {fileID: 1807225547}
-  passwordInputField: {fileID: 1532975044}
-  confirmPasswordInputField: {fileID: 902533916}
-  signUpButton: {fileID: 523591308}
-  backToLoginButton: {fileID: 1694213818}
-  showPasswordButton: {fileID: 2055120355}
-  eyeOpenSprite: {fileID: 21300000, guid: 32d50ff9c90abe64eb5ca0383b4facd1, type: 3}
-  eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
-  passwordEyeIcon: {fileID: 0}
-  loginScreenSceneName: Loading Screen 1
 --- !u!1 &1936143508
 GameObject:
   m_ObjectHideFlags: 0
@@ -6884,11 +6806,11 @@ MonoBehaviour:
   generateNewButton: {fileID: 810157445}
   loginButton: {fileID: 88770643}
   updateUsernameButton: {fileID: 730087670}
-  loadingScreenSceneName: 
+  loadingScreenSceneName: Loading Screen 1
   mainScreenSceneName: Main Screen
   loadingScreenDuration: 2
-  useSceneLoading: 0
-  generateOnAwake: 1
+  useSceneLoading: 1
+  generateOnAwake: 0
   generateOnStart: 1
   enabledButtonColor: {r: 1, g: 1, b: 1, a: 1}
   disabledButtonColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
@@ -7036,17 +6958,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1962631744}
   m_CullTransparentMesh: 1
---- !u!114 &2055120355 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 2859814576442559736, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-  m_PrefabInstance: {fileID: 209027551864307723}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &2092172947
 GameObject:
   m_ObjectHideFlags: 0
@@ -7473,10 +7384,6 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1715481328609465350, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 3220553820715523367, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -7557,17 +7464,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 5257885783442336432, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-      propertyPath: m_text
-      value: 
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 724439706280574869, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1929775979}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
 --- !u!1001 &944001789114450539
 PrefabInstance:
@@ -7588,6 +7488,10 @@ PrefabInstance:
     - target: {fileID: 5366653206127996204, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
       propertyPath: m_Name
       value: Sign in Panel
+      objectReference: {fileID: 0}
+    - target: {fileID: 5366653206127996204, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7838658626764987359, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target

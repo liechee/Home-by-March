@@ -29,7 +29,7 @@ public class RestartGameManager : MonoBehaviour
     [Header("Step Reset")]
     [Tooltip("Set daily steps to zero on new game")]
     [SerializeField] private bool resetDailySteps = true;
-    
+
     [Tooltip("Set overall steps to zero on new game")]
     [SerializeField] private bool resetOverallSteps = true;
 
@@ -41,50 +41,43 @@ public class RestartGameManager : MonoBehaviour
     /// </summary>
     public async void RestartNewGame()
     {
-        Debug.Log("[NewGame] ── Starting New Game - Resetting all progress ──────────────────");
+        Debug.Log("[NewGame] ── Starting New Game ──────────────────");
 
-        // Show loading UI
         if (loadingPanel != null) loadingPanel.SetActive(true);
         await Task.Yield();
 
-        // Reset Step Counter - set daily and overall steps to zero
-        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
-        if (stepCounter != null)
-        {
-            stepCounter.isLoggingOut = true;
-            stepCounter.ResetStepDataCompletely();
-            
-            // Ensure steps are explicitly set to zero
-            stepCounter.ResetToNewGameState(resetDailySteps, resetOverallSteps);
-            Debug.Log($"[NewGame] Step data reset: dailySteps={resetDailySteps}, overallSteps={resetOverallSteps}");
-        }
+        // 1. Clear PlayerPrefs first (so offset keys are gone before re-init reads them)
+        ClearPlayerPrefsForNewGame();
 
-        // Reset Player Data
+        // 2. Reset inventory and player data
+        ResetInventoryObjects();
+
         PlayerData playerData = FindObjectOfType<PlayerData>();
         if (playerData != null)
         {
             playerData.isLoggingOut = true;
             playerData.ResetToNewGame();
-            Debug.Log("[NewGame] PlayerData reset to new game state.");
+            playerData.isLoggingOut = false;
+            Debug.Log("[NewGame] PlayerData reset.");
         }
 
-        // Reset all inventory objects
-        ResetInventoryObjects();
-        
-        // Delete all local save files
+        // 3. Delete save files
         DeleteLocalSaveFiles();
-        
-        // Clear PlayerPrefs but keep essential session data
-        ClearPlayerPrefsForNewGame();
 
-        // Optional: Delete cloud save data for a fresh start
+        // 4. Delete cloud data
         await DeleteCloudSaveData();
 
-        // Delay and load target scene
-        float delay = reloadDelay;
-        string sceneName = targetSceneName;
-        await Task.Delay(TimeSpan.FromSeconds(delay));
-        SceneManager.LoadScene(sceneName);
+        // 5. Re-initialize the step counter IN-MEMORY (no scene reload needed for this)
+        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        if (stepCounter != null)
+        {
+            stepCounter.ReInitializeForNewGame();
+            stepCounter.RestartAsNewSession();
+        }
+
+        // 6. Small delay then load scene — RefreshLoop will already be running by now
+        await Task.Delay(TimeSpan.FromSeconds(reloadDelay));
+        SceneManager.LoadScene(targetSceneName);
     }
 
     /// <summary>
@@ -136,21 +129,22 @@ public class RestartGameManager : MonoBehaviour
     {
         // Clear all PlayerPrefs but mark that this is a new game session
         PlayerPrefs.DeleteAll();
-        
+
         // Set new game flags
         PlayerPrefs.SetInt("IsNewGame", 1);
         PlayerPrefs.SetInt("GameStartedFresh", 1);
         PlayerPrefs.SetInt("SuppressStepQuery", 0);
         PlayerPrefs.SetInt("SuppressCloudRestore", 0);
+        PlayerPrefs.SetInt("NewGamePendingBaseline", 1);
         PlayerPrefs.Save();
-        
+
         Debug.Log("[NewGame] PlayerPrefs cleared for new game.");
     }
 
     private static void DeleteLocalSaveFiles()
     {
         string root = Application.persistentDataPath;
-        
+
         // Delete all known save files
         foreach (string relativePath in GetLocalSaveFileNames())
         {
@@ -165,7 +159,7 @@ public class RestartGameManager : MonoBehaviour
                 DeleteFileIfExists(datFile);
             }
         }
-        
+
         Debug.Log("[NewGame] Local save files deleted.");
     }
 

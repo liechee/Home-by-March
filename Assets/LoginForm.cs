@@ -14,28 +14,28 @@ public class LoginForm : MonoBehaviour
     [SerializeField] private TMP_Text welcomeText;
 
     [Header("Login Panel")]
-    [SerializeField] private TMP_InputField  usernameInputField;
-    [SerializeField] private TMP_InputField  passwordInputField;
-    [SerializeField] private Button          signInButton;
-    [SerializeField] private Button          signUpButton;
+    [SerializeField] private TMP_InputField usernameInputField;
+    [SerializeField] private TMP_InputField passwordInputField;
+    [SerializeField] private Button signInButton;
+    [SerializeField] private Button signUpButton;
 
     [Header("Password Visibility")]
     [SerializeField] private Button showPasswordButton;
     [SerializeField] private Sprite eyeOpenSprite;
     [SerializeField] private Sprite eyeClosedSprite;
-    [SerializeField] private Image  eyeIconImage;
+    [SerializeField] private Image eyeIconImage;
 
     [Header("Scene Loading")]
     [SerializeField] private string mainScreenSceneName = "Main Screen";
-    [SerializeField] private string signUpSceneName     = "SignUpScene";
+    [SerializeField] private string signUpSceneName = "SignUpScene";
 
     // ── Private state ─────────────────────────────────────────────────────────
 
     private GuestUsernameGenerator usernameGenerator;
     private string currentGuestUsername;
-    private bool   isProcessing;
-    private bool   isPasswordVisible;
-    private bool   isLoadingScene;
+    private bool isProcessing;
+    private bool isPasswordVisible;
+    private bool isLoadingScene;
     private PlayerData playerData;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ public class LoginForm : MonoBehaviour
             ShowWelcomeMessage($"Welcome back, {name}!");
 
             if (!isLoadingScene && !IsInMainScene())
-                LoadMainScreen();
+                _ = LoadCloudStepsThenNavigate();
         }
         else
         {
@@ -220,6 +220,18 @@ public class LoginForm : MonoBehaviour
         if (result.IsSuccess)
         {
             ShowStatusMessage("Sign in successful!", false);
+            // ← Directly trigger cloud load on the persistent step counter
+            OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>(true);
+            if (stepCounter != null)
+            {
+                PlayerPrefs.DeleteKey("SuppressCloudRestore");
+                PlayerPrefs.DeleteKey("HasLoggedOut");
+                PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
+                PlayerPrefs.SetInt("IsGuestSession", 0);
+                PlayerPrefs.Save();
+
+                stepCounter.RestartAsNewSession();
+            }
         }
         else
         {
@@ -267,8 +279,23 @@ public class LoginForm : MonoBehaviour
     private void UpdateEyeIcon()
     {
         if (eyeIconImage == null) return;
-        if (isPasswordVisible  && eyeOpenSprite   != null) eyeIconImage.sprite = eyeOpenSprite;
-        if (!isPasswordVisible && eyeClosedSprite  != null) eyeIconImage.sprite = eyeClosedSprite;
+        if (isPasswordVisible && eyeOpenSprite != null) eyeIconImage.sprite = eyeOpenSprite;
+        if (!isPasswordVisible && eyeClosedSprite != null) eyeIconImage.sprite = eyeClosedSprite;
+    }
+
+    // ── Cloud step pre-load ─────────────────────────────────────────────────────────────
+
+    private async Task LoadCloudStepsThenNavigate()
+    {
+        // OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        // if (stepCounter != null && !stepCounter.cloudLoaded)
+        // {
+        //     Debug.Log("[LoginForm] Pre-loading cloud step data before scene transition…");
+        //     await stepCounter.LoadStepDataFromCloud();
+        //     Debug.Log("[LoginForm] Cloud step data loaded.");
+        // }
+
+        LoadMainScreen();
     }
 
     // ── Scene loading ─────────────────────────────────────────────────────────
@@ -296,7 +323,7 @@ public class LoginForm : MonoBehaviour
     private void ShowStatusMessage(string message, bool isError)
     {
         if (statusText == null) return;
-        statusText.text  = message;
+        statusText.text = message;
         statusText.color = isError ? Color.red : Color.green;
 
         if (!string.IsNullOrEmpty(message))
@@ -312,8 +339,8 @@ public class LoginForm : MonoBehaviour
 
     private void SetButtonsInteractable(bool interactable)
     {
-        if (signInButton       != null) signInButton.interactable       = interactable;
-        if (signUpButton       != null) signUpButton.interactable       = interactable;
+        if (signInButton != null) signInButton.interactable = interactable;
+        if (signUpButton != null) signUpButton.interactable = interactable;
         if (showPasswordButton != null) showPasswordButton.interactable = interactable;
     }
 }

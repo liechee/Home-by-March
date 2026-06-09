@@ -35,24 +35,24 @@ public class AccountHubUI : MonoBehaviour
 
     [Header("Sign In Panel")]
     [Tooltip("Shown when a guest wants to sign into an existing account.")]
-    [SerializeField] GameObject     m_SignInPanel;
+    [SerializeField] GameObject m_SignInPanel;
     [SerializeField] TMP_InputField m_SignInUsernameField;
     [SerializeField] TMP_InputField m_SignInPasswordField;
-    [SerializeField] Button         m_SignInConfirmBtn;
-    [SerializeField] Button         m_SignInEyeBtn;
-    [SerializeField] Image          m_SignInEyeIcon;
-    [SerializeField] TMP_Text       m_SignInStatusText;
+    [SerializeField] Button m_SignInConfirmBtn;
+    [SerializeField] Button m_SignInEyeBtn;
+    [SerializeField] Image m_SignInEyeIcon;
+    [SerializeField] TMP_Text m_SignInStatusText;
 
     [Header("Register Panel")]
     [Tooltip("Shown when a guest wants to upgrade their session to a permanent account.")]
-    [SerializeField] GameObject     m_RegisterPanel;
+    [SerializeField] GameObject m_RegisterPanel;
     [SerializeField] TMP_InputField m_RegisterUsernameField;
     [SerializeField] TMP_InputField m_RegisterPasswordField;
     [SerializeField] TMP_InputField m_RegisterConfirmPasswordField;
-    [SerializeField] Button         m_RegisterConfirmBtn;
-    [SerializeField] Button         m_RegisterEyeBtn;
-    [SerializeField] Image          m_RegisterEyeIcon;
-    [SerializeField] TMP_Text       m_RegisterStatusText;
+    [SerializeField] Button m_RegisterConfirmBtn;
+    [SerializeField] Button m_RegisterEyeBtn;
+    [SerializeField] Image m_RegisterEyeIcon;
+    [SerializeField] TMP_Text m_RegisterStatusText;
 
     [Header("Shared Eye Sprites")]
     [SerializeField] Sprite m_EyeOpenSprite;
@@ -332,8 +332,8 @@ public class AccountHubUI : MonoBehaviour
     {
         if (_isProcessing) return;
 
-        string username        = m_RegisterUsernameField?.text?.Trim();
-        string password        = m_RegisterPasswordField?.text;
+        string username = m_RegisterUsernameField?.text?.Trim();
+        string password = m_RegisterPasswordField?.text;
         string confirmPassword = m_RegisterConfirmPasswordField?.text;
 
         if (!ValidateUsername(username)) return;
@@ -348,6 +348,12 @@ public class AccountHubUI : MonoBehaviour
         _isProcessing = true;
         SetPanelInteractable(m_RegisterPanel, false);
         ShowStatus(m_RegisterStatusText, "Creating account…", false);
+
+        PlayerPrefs.SetInt("IsGuestUpgrade", 1);
+        PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
+        PlayerPrefs.SetInt("IsGuestSession", 0);
+        PlayerPrefs.DeleteKey("SuppressCloudRestore");
+        PlayerPrefs.Save();
 
         // Links credentials to the existing guest player ID — all cloud data carries over.
         AuthResult result = await AuthManager.Instance.UpgradeGuestToAccountAsync(username, password);
@@ -413,7 +419,7 @@ public class AccountHubUI : MonoBehaviour
     private void UpdateEyeIcon(Image icon, bool isVisible)
     {
         if (icon == null) return;
-        if (isVisible  && m_EyeOpenSprite  != null) icon.sprite = m_EyeOpenSprite;
+        if (isVisible && m_EyeOpenSprite != null) icon.sprite = m_EyeOpenSprite;
         if (!isVisible && m_EyeClosedSprite != null) icon.sprite = m_EyeClosedSprite;
     }
 
@@ -493,7 +499,7 @@ public class AccountHubUI : MonoBehaviour
     private void ShowStatus(TMP_Text target, string message, bool isError)
     {
         if (target == null) return;
-        target.text  = message;
+        target.text = message;
         target.color = isError ? Color.red : Color.green;
 
         if (!string.IsNullOrEmpty(message))
@@ -508,11 +514,11 @@ public class AccountHubUI : MonoBehaviour
 
     private void ClearAllInputs()
     {
-        if (m_SignInUsernameField           != null) m_SignInUsernameField.text           = "";
-        if (m_SignInPasswordField           != null) m_SignInPasswordField.text           = "";
-        if (m_RegisterUsernameField         != null) m_RegisterUsernameField.text         = "";
-        if (m_RegisterPasswordField         != null) m_RegisterPasswordField.text         = "";
-        if (m_RegisterConfirmPasswordField  != null) m_RegisterConfirmPasswordField.text  = "";
+        if (m_SignInUsernameField != null) m_SignInUsernameField.text = "";
+        if (m_SignInPasswordField != null) m_SignInPasswordField.text = "";
+        if (m_RegisterUsernameField != null) m_RegisterUsernameField.text = "";
+        if (m_RegisterPasswordField != null) m_RegisterPasswordField.text = "";
+        if (m_RegisterConfirmPasswordField != null) m_RegisterConfirmPasswordField.text = "";
     }
 
     private void SetPanelInteractable(GameObject panel, bool interactable)

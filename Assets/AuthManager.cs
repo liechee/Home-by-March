@@ -818,7 +818,7 @@ public class AuthManager : MonoBehaviour
         401 => "Unauthorized. Please try again.",
         403 => "Access forbidden. Please contact support.",
         409 => "Username already exists. Please choose a different username.",
-        _ => $"Registration failed. (Error: {code})"
+        _ => $"Registration failed: {fallback}"
     };
 }
 

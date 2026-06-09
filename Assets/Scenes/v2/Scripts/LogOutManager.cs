@@ -24,7 +24,7 @@ public class LogOutManager : MonoBehaviour
 
     [Header("Navigation")]
     [SerializeField] private string loginSceneName = "Log In";
-    [SerializeField] private float  reloadDelay    = 1.5f;
+    [SerializeField] private float reloadDelay = 1.5f;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -32,19 +32,21 @@ public class LogOutManager : MonoBehaviour
     {
         Debug.Log("[LogOut] ── Starting logout ──────────────────────────────────");
 
-        // Let the UI show a frame before the sign-out work starts.
         if (loadingPanel != null) loadingPanel.SetActive(true);
         await Task.Yield();
 
         OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        PlayerData playerData = FindObjectOfType<PlayerData>();
+
         if (stepCounter != null)
         {
-            stepCounter.isLoggingOut = true;
-            stepCounter.ResetStepDataCompletely();
-            Debug.Log("[LogOut] Step data reset.");
+            // stepCounter.isLoggingOut = true;
+            // stepCounter.ResetStepDataForLogout(); // Use this instead of ResetStepDataCompletely
+            //stepCounter.PrepareForLogout();
+            stepCounter.RestartAsNewSession();
+            Debug.Log("[LogOut] Step data preserved for next login.");
         }
 
-        PlayerData playerData = FindObjectOfType<PlayerData>();
         if (playerData != null)
         {
             playerData.isLoggingOut = true;
@@ -56,17 +58,14 @@ public class LogOutManager : MonoBehaviour
         DeleteLocalSaveFiles();
         ClearPlayerPrefsForNewSession();
 
-        // Sign out of Unity services (also clears on-disk session token).
         await EnsureServicesInitializedAsync();
         SignOutServices();
 
-        // Mark the session as explicitly logged out so Scene1 does not auto-resume.
-        //PlayerPrefs.SetInt(AuthManager.PrefHasLoggedOut, 1);
+        PlayerPrefs.SetInt("HasLoggedOut", 1);
         PlayerPrefs.Save();
         Debug.Log("[LogOut] Logout flag written.");
 
-        // Capture locals before the async gap to avoid captured-variable issues.
-        float  delay     = reloadDelay;
+        float delay = reloadDelay;
         string sceneName = loginSceneName;
         await Task.Delay(TimeSpan.FromSeconds(delay));
         SceneManager.LoadScene(sceneName);
@@ -106,7 +105,8 @@ public class LogOutManager : MonoBehaviour
     private static void ClearPlayerPrefsForNewSession()
     {
         PlayerPrefs.DeleteAll();
-        PlayerPrefs.SetInt(AuthManager1.PrefHasLoggedOut, 1);
+        PlayerPrefs.SetInt("HasLoggedOut", 1);
+        PlayerPrefs.SetInt("SuppressCloudRestore", 1); // ← add this
         PlayerPrefs.Save();
     }
 
@@ -176,20 +176,20 @@ public class LogOutManager : MonoBehaviour
         }
     }
 
-/// <summary>
-/// Resets player data to new game state (fresh start)
-/// </summary>
-public void ResetToNewGame()
-{
-    // Reset all player stats to default values
-    // Add your specific player data reset logic here
-    
-    // Example:
-    // playerLevel = 1;
-    // playerExp = 0;
-    // playerGold = 0;
-    // etc.
-    
-    Debug.Log("[NewGame] Player data reset to new game state.");
-}
+    /// <summary>
+    /// Resets player data to new game state (fresh start)
+    /// </summary>
+    public void ResetToNewGame()
+    {
+        // Reset all player stats to default values
+        // Add your specific player data reset logic here
+
+        // Example:
+        // playerLevel = 1;
+        // playerExp = 0;
+        // playerGold = 0;
+        // etc.
+
+        Debug.Log("[NewGame] Player data reset to new game state.");
+    }
 }

@@ -338,19 +338,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 88770644}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: NameChangePanel, Assembly-CSharp
-        m_MethodName: ChangeName
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &88770644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1298,9 +1286,7 @@ MonoBehaviour:
   eyeClosedSprite: {fileID: 21300000, guid: f28f4efa9aedff24680b09f73e52d265, type: 3}
   eyeIconImage: {fileID: 1422445714}
   mainScreenSceneName: Main Screen
-  loadingScreenSceneName: Loading Screen 1
   signUpSceneName: 
-  loadingScreenDuration: 2
 --- !u!1 &509304658
 GameObject:
   m_ObjectHideFlags: 0
@@ -2224,19 +2210,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 730087671}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: NameChangePanel, Assembly-CSharp
-        m_MethodName: ChangeName
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &730087671
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6806,10 +6780,7 @@ MonoBehaviour:
   generateNewButton: {fileID: 810157445}
   loginButton: {fileID: 88770643}
   updateUsernameButton: {fileID: 730087670}
-  loadingScreenSceneName: Loading Screen 1
   mainScreenSceneName: Main Screen
-  loadingScreenDuration: 2
-  useSceneLoading: 1
   generateOnAwake: 0
   generateOnStart: 1
   enabledButtonColor: {r: 1, g: 1, b: 1, a: 1}

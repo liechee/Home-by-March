@@ -1337,18 +1337,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: AccountHubUI, Assembly-CSharp
-        m_MethodName: OnSignOutButtonClicked
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
 --- !u!114 &112985307
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5275,7 +5263,7 @@ MonoBehaviour:
   refreshInterval: 2
   stepChangeThreshold: 1
   debugStepQueries: 0
-  diskSaveInterval: 10
+  diskSaveInterval: 5
   stepData:
     lastSaveTime: 
     registrationTime: 
@@ -5290,6 +5278,7 @@ MonoBehaviour:
   cloudLoaded: 0
   stepDataJsonFilePath: 
   isLoggingOut: 0
+  savedDailyBase: 0
   initializingFreshData: 0
 --- !u!224 &507941527
 RectTransform:
@@ -6740,7 +6729,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8009225417242373154, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
       propertyPath: m_text
-      value: '!  Continue your path by signing in !'
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 8009225417242373154, guid: 76a2331aff2942449a9d4deb3dbe8abe, type: 3}
       propertyPath: m_fontColor.b
@@ -24022,7 +24011,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5257885783442336432, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
       propertyPath: m_text
-      value: '! Continue your path by signing in !'
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5257885783442336432, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
+      propertyPath: m_margin.x
+      value: -5.193878
       objectReference: {fileID: 0}
     - target: {fileID: 5257885783442336432, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
       propertyPath: m_fontColor.b
@@ -24067,6 +24060,18 @@ PrefabInstance:
     - target: {fileID: 7001068185028497090, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4294967295
+      objectReference: {fileID: 0}
+    - target: {fileID: 7465701780243200189, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 1383.595
+      objectReference: {fileID: 0}
+    - target: {fileID: 7465701780243200189, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 24.866718
+      objectReference: {fileID: 0}
+    - target: {fileID: 7465701780243200189, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -310
       objectReference: {fileID: 0}
     - target: {fileID: 8534362653287817681, guid: 50343a7a03ec9534194c0f8baa0bfd08, type: 3}
       propertyPath: m_Sprite

@@ -93,7 +93,11 @@ public class UserLevel : MonoBehaviour
         if (stepCounter != null && stepCounter.stepData != null)
         {
             overallStepCount = stepCounter.overallSteps;
-            dailyStepCount = stepCounter.savedDailyBase; // Use saved daily steps to avoid resetting on app restart
+            // Use the live accumulated daily total, not just the session's fixed baseline —
+            // savedDailyBase never grows during the session, so using it alone causes the
+            // displayed daily count to drop back to its starting value whenever this object
+            // re-initializes (e.g. returning to the main scene from elsewhere).
+            dailyStepCount = Mathf.Max(stepCounter.stepData.dailySteps, stepCounter.savedDailyBase);
             currentStepCount = dailyStepCount;
             RecalculateLevelAndXP();
             RefreshUI();

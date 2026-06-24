@@ -23,6 +23,7 @@ public class OverallStepCounter : MonoBehaviour
 
     public StepData stepData;
     public int overallSteps;
+    public int daily;
     public int overallStepsBeforeToday;
     public bool cloudLoaded = false;
     public string stepDataJsonFilePath;
@@ -72,6 +73,7 @@ public class OverallStepCounter : MonoBehaviour
     // Guest login delay flag
     private bool isGuestLoginPending = false;
     private Coroutine delayedGuestStartCoroutine;
+    private bool readyToCount = false;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Unity lifecycle
@@ -233,6 +235,7 @@ public class OverallStepCounter : MonoBehaviour
         cloudLoaded = false;
         waitingForCloudData = false;
         beforeTodaySettled = false;
+        readyToCount = false;
         offsetRecalibrated = false;
         signedInThisSession = false;
         appOpenCaptured = false;
@@ -492,24 +495,37 @@ public class OverallStepCounter : MonoBehaviour
 
             int prev = overallSteps;
             int prevDaily = stepData.dailySteps;
-            int todayNet = CalcTodayNetSteps(deviceNow);
-            overallSteps = overallStepsBeforeToday + todayNet;
-
             int daily = CalcDailySteps(deviceNow);
-            daily = Mathf.Max(daily, savedDailyBase);
-            daily = Mathf.Clamp(daily, 0, overallSteps);
+            daily = Mathf.Clamp(daily, 0, int.MaxValue);
+            //int todayNet = CalcTodayNetSteps(deviceNow);
+            //overallSteps = overallStepsBeforeToday + todayNet;
+
+            
+            //daily = Mathf.Max(daily, savedDailyBase);
+            // daily = Mathf.Max(daily, prevDaily);
+            
+            overallSteps = overallStepsBeforeToday + daily;
 
             // ← Never let overall or daily decrease mid-session
             // Steps only go up unless it's a new day
             overallSteps = Mathf.Max(overallSteps, prev);
-            daily = Mathf.Max(daily, prevDaily);
+            
 
-            savedDailyBase = Mathf.Max(savedDailyBase, daily);
 
-            stepData.dailySteps = daily;
+            // NOTE: Do NOT do `savedDailyBase = Mathf.Max(savedDailyBase, daily);` here.
+            // `daily` already equals `savedDailyBase + stepsSinceOpen` (see CalcDailySteps).
+            // Re-assigning it back into savedDailyBase bakes the already-counted
+            // stepsSinceOpen into the base, so the *next* poll adds the same
+            // stepsSinceOpen on top again — causing daily/overall steps to climb every
+            // refresh tick even with zero real device movement (the runaway-without-
+            // movement bug seen on guest first login and same-day cloud restore, where
+            // stepData.baselineSteps ends up <= 0 and CalcDailySteps falls into the
+            // appOpenCaptured fallback branch). savedDailyBase must stay a fixed
+            // snapshot for the session; it's already (re)seeded correctly on load/init.
+            // stepData.dailySteps = daily;
 
             int overallDelta = Math.Abs(overallSteps - prev);
-            int dailyDelta = Math.Abs(daily - stepData.dailySteps);
+            int dailyDelta = Math.Abs(daily - prevDaily);
 
             bool verbose = debugStepQueries || verbosePostCloudPolls > 0;
             if (verbosePostCloudPolls > 0) verbosePostCloudPolls--;
@@ -533,7 +549,7 @@ public class OverallStepCounter : MonoBehaviour
     {
         while (true)
         {
-            if (!waitingForCloudData)  // ← wrap the call
+            if (!waitingForCloudData && readyToCount)  // ← wrap the call
                 GetOverallSteps();
             yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, refreshInterval));
 
@@ -785,8 +801,10 @@ public class OverallStepCounter : MonoBehaviour
                 FinalizeCloudLoad();
                 return;
             }
-            //int stepsBeforeToday = Math.Max(0, cloudBase - cloudSavedDaily);
-           
+            int stepsBeforeToday = stepData.stepsBeforeToday > 0
+        ? stepData.stepsBeforeToday
+        : Math.Max(0, cloudBase - cloudSavedDaily);
+
             // if (!appOpenCaptured)
             // {
             //     appOpenDeviceSteps = deviceNow;
@@ -797,13 +815,17 @@ public class OverallStepCounter : MonoBehaviour
             signInDeviceSteps = deviceNow;
             signedInThisSession = false;
 
-            overallStepsBeforeToday = cloudBase;
+            overallStepsBeforeToday = stepsBeforeToday;
             beforeTodaySettled = true;
             overallSteps = cloudBase;
+            readyToCount = true;
 
             savedDailyBase = cloudSavedDaily;
             stepData.dailySteps = cloudSavedDaily;
             //stepData.baselineSteps = 0;
+
+            int impliedBaseline = Math.Max(0, deviceNow - cloudSavedDaily);
+            stepData.baselineSteps = impliedBaseline;
 
             PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
             PlayerPrefs.Save();
@@ -838,10 +860,13 @@ public class OverallStepCounter : MonoBehaviour
             overallStepsBeforeToday = cloudBase;
             overallSteps = cloudBase;
             beforeTodaySettled = true;
+            readyToCount = true;
+
+            stepData.baselineSteps = deviceNow;
 
             savedDailyBase = stepData.dailySteps > 0 ? stepData.dailySteps : 0;
             stepData.dailySteps = Mathf.Clamp(stepData.dailySteps, 0, overallSteps);
-            
+
 
             PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
             PlayerPrefs.Save();
@@ -879,6 +904,9 @@ public class OverallStepCounter : MonoBehaviour
                 overallStepsBeforeToday = accumulated;
                 overallSteps = accumulated;
                 beforeTodaySettled = true;
+                readyToCount = true;
+
+                stepData.baselineSteps = deviceNow;
 
                 savedDailyBase = stepData.dailySteps > 0 ? stepData.dailySteps : 0;
                 stepData.dailySteps = Mathf.Clamp(stepData.dailySteps, 0, overallSteps);
@@ -910,7 +938,7 @@ public class OverallStepCounter : MonoBehaviour
                 overallStepsBeforeToday = diskData.stepsBeforeToday > 0 ? diskData.stepsBeforeToday : diskOverall;
                 stepData.overallSteps = diskOverall;
                 stepData.numberOfSteps = diskOverall;
-                stepData.dailySteps = diskData.dailySteps;
+                //stepData.dailySteps = diskData.dailySteps;
                 stepData.stepsBeforeToday = overallStepsBeforeToday;
             }
         }
@@ -1099,6 +1127,7 @@ public class OverallStepCounter : MonoBehaviour
         offsetRecalibrated = false;
         queryInFlight = false;
         beforeTodaySettled = false;
+        readyToCount = false;
         isGuestLoginPending = false;
 
         overallSteps = 0;
@@ -1139,6 +1168,7 @@ public class OverallStepCounter : MonoBehaviour
             appOpenDeviceSteps = deviceNow;
             appOpenCaptured = true;
             beforeTodaySettled = true;
+            readyToCount = true;
 
             PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
             PlayerPrefs.DeleteKey("NewGamePendingBaseline");
@@ -1190,6 +1220,7 @@ public class OverallStepCounter : MonoBehaviour
         overallStepsBeforeToday = 0;
         savedDailyBase = 0;
         beforeTodaySettled = false;
+        readyToCount = false;
         offsetRecalibrated = false;
         cloudLoaded = false;
         appOpenCaptured = false;
@@ -1206,6 +1237,7 @@ public class OverallStepCounter : MonoBehaviour
             appOpenDeviceSteps = deviceNow;
             appOpenCaptured = true;
             beforeTodaySettled = true;
+            readyToCount = true;
 
             PlayerPrefs.DeleteKey("HasLoggedOut");
             PlayerPrefs.DeleteKey("SuppressStepQuery");
@@ -1336,6 +1368,7 @@ public class OverallStepCounter : MonoBehaviour
         lastKnownDeviceSteps = 0;
         lastKnownDeviceCaptured = false;
         beforeTodaySettled = false;
+        readyToCount = false;
         offsetRecalibrated = false;
         cloudLoaded = false;
         appOpenTcs = new TaskCompletionSource<int>();
@@ -1376,8 +1409,10 @@ public class OverallStepCounter : MonoBehaviour
             stepData.dailySteps = 0;
             stepData.overallSteps = 0;
             stepData.numberOfSteps = 0;
+            savedDailyBase = 0;
 
             beforeTodaySettled = true;
+            readyToCount = true;
 
             WriteToDisk();
 
@@ -1547,6 +1582,8 @@ public class OverallStepCounter : MonoBehaviour
 
             overallSteps = 0;
             stepData.dailySteps = 0;
+            beforeTodaySettled = true;
+            readyToCount = true;
 
             onStepsUpdated?.Invoke(0, 0);
 
@@ -1686,6 +1723,7 @@ public class OverallStepCounter : MonoBehaviour
         overallSteps = 0;
         overallStepsBeforeToday = 0;
         beforeTodaySettled = false;
+        readyToCount = false;
         waitingForCloudData = false;
         cloudLoaded = false;
         savedDailyBase = 0;

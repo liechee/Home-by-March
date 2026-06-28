@@ -49,7 +49,12 @@
         "Obj/": true,
         "ProjectSettings/": true,
         "temp/": true,
-        "Temp/": true
+        "Temp/": true,
+        "**/*.csproj": true,
+        "**/*.csproj.lscache": true,
+        "**/*.sln": true,
+        "**/*.lscache": true,
+        "user.keystore": true
     },
     "dotnet.defaultSolution": "Home-by-March.sln"
 }

@@ -97,7 +97,7 @@ public class UserLevel : MonoBehaviour
             // savedDailyBase never grows during the session, so using it alone causes the
             // displayed daily count to drop back to its starting value whenever this object
             // re-initializes (e.g. returning to the main scene from elsewhere).
-            dailyStepCount = Mathf.Max(stepCounter.stepData.dailySteps, stepCounter.savedDailyBase);
+            dailyStepCount = stepCounter.lastBroadcastDaily;
             currentStepCount = dailyStepCount;
             RecalculateLevelAndXP();
             RefreshUI();
@@ -125,10 +125,12 @@ public class UserLevel : MonoBehaviour
         stepCounter = FindObjectOfType<OverallStepCounter>();
         playerData = FindObjectOfType<PlayerData>();
         // Force immediate refresh if step counter already has data
-        if (stepCounter != null && stepCounter.stepData != null)
+        if (stepCounter != null &&
+        stepCounter.stepData != null &&
+        !stepCounter.initializingFreshData)
         {
             int overall = stepCounter.overallSteps;
-            int daily = Mathf.Max(stepCounter.stepData.dailySteps, stepCounter.savedDailyBase);
+            int daily = stepCounter.lastBroadcastDaily;;
 
             Debug.Log($"[UserLevel] OnEnable immediate refresh — overall={overall}, daily={daily}");
             ApplySteps(overall, daily);

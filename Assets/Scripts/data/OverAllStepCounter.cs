@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 public class OverallStepCounter : MonoBehaviour
 {
     [Tooltip("Seconds between step polls.")]
-    public float refreshInterval = 0.5f;
+    public float refreshInterval = 0.1f;
 
     [Tooltip("Minimum step change before firing onStepsUpdated. Keep at 1.")]
     public int stepChangeThreshold = 1;
@@ -55,7 +55,7 @@ public class OverallStepCounter : MonoBehaviour
 
     private bool queryInFlight = false;
     private float queryDispatchTime = 0f;
-    private const float QueryTimeout = 2f;
+    private const float QueryTimeout = 1f;
 
     private int lastKnownDeviceSteps = 0;
     private bool lastKnownDeviceCaptured = false;
@@ -74,6 +74,7 @@ public class OverallStepCounter : MonoBehaviour
     private bool isGuestLoginPending = false;
     private Coroutine delayedGuestStartCoroutine;
     private bool readyToCount = false;
+    public int lastBroadcastDaily { get; private set; } = 0;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Unity lifecycle
@@ -300,6 +301,7 @@ public class OverallStepCounter : MonoBehaviour
         if (pendingLocalFireOnStart)
         {
             pendingLocalFireOnStart = false;
+            lastBroadcastDaily = stepData.dailySteps;
             onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
             onLoaded?.Invoke();
         }
@@ -413,6 +415,7 @@ public class OverallStepCounter : MonoBehaviour
                 savedDailyBase = stepData.dailySteps;
 
             beforeTodaySettled = true;
+            readyToCount = true;
             queryInFlight = true;
             queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
@@ -422,6 +425,7 @@ public class OverallStepCounter : MonoBehaviour
             savedDailyBase = 0;
             overallStepsBeforeToday = stepData.numberOfSteps;
             beforeTodaySettled = true;
+            readyToCount = true;
             queryInFlight = true;
             queryDispatchTime = Time.realtimeSinceStartup;
             QueryTodayAndUpdate(gen);
@@ -435,6 +439,7 @@ public class OverallStepCounter : MonoBehaviour
                 if (IsStale(gen)) return;
                 overallStepsBeforeToday = snapshot + range;
                 beforeTodaySettled = true;
+                readyToCount = true;
                 queryInFlight = true;
                 queryDispatchTime = Time.realtimeSinceStartup;
                 QueryTodayAndUpdate(gen);
@@ -500,16 +505,16 @@ public class OverallStepCounter : MonoBehaviour
             //int todayNet = CalcTodayNetSteps(deviceNow);
             //overallSteps = overallStepsBeforeToday + todayNet;
 
-            
+
             //daily = Mathf.Max(daily, savedDailyBase);
             // daily = Mathf.Max(daily, prevDaily);
-            
+
             overallSteps = overallStepsBeforeToday + daily;
 
             // ← Never let overall or daily decrease mid-session
             // Steps only go up unless it's a new day
             overallSteps = Mathf.Max(overallSteps, prev);
-            
+
 
 
             // NOTE: Do NOT do `savedDailyBase = Mathf.Max(savedDailyBase, daily);` here.
@@ -537,8 +542,15 @@ public class OverallStepCounter : MonoBehaviour
                           $"savedBase={savedDailyBase}, " +
                           $"stepsSinceOpen={deviceNow - appOpenDeviceSteps}");
 
-            if (overallDelta >= stepChangeThreshold || dailyDelta >= stepChangeThreshold)
-                onStepsUpdated?.Invoke(overallSteps, daily);
+            // if (overallDelta >= stepChangeThreshold || dailyDelta >= stepChangeThreshold)
+            //     onStepsUpdated?.Invoke(overallSteps, daily);
+
+            bool overallIncreased = overallSteps > prev;
+            bool dailyIncreased = daily > prevDaily;
+
+            lastBroadcastDaily = daily;
+            onStepsUpdated?.Invoke(overallSteps, daily);
+
 
             //stepData.dailySteps = daily;
             SaveStepData(deviceNow, gen, dailyOverride: daily);
@@ -703,7 +715,7 @@ public class OverallStepCounter : MonoBehaviour
                 Debug.LogWarning("[CLOUD] Received null/empty JSON — aborting cloud load to protect local data.");
                 waitingForCloudData = false;
                 cloudLoaded = true;
-                if (stepData != null) { onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
+                if (stepData != null) { lastBroadcastDaily = stepData.dailySteps; onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
                 else LoadStepData();
                 if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
                     refreshCoroutine = StartCoroutine(RefreshLoop());
@@ -725,7 +737,8 @@ public class OverallStepCounter : MonoBehaviour
                 Debug.LogWarning($"[CLOUD] Parsed cloud data is zero/null but local has {localOverallSnapshot} steps — aborting to protect local data.");
                 waitingForCloudData = false;
                 cloudLoaded = true;
-                onStepsUpdated?.Invoke(overallSteps, stepData?.dailySteps ?? 0);
+                lastBroadcastDaily = stepData?.dailySteps ?? 0;
+                onStepsUpdated?.Invoke(overallSteps, lastBroadcastDaily);
                 onLoaded?.Invoke();
                 if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
                     refreshCoroutine = StartCoroutine(RefreshLoop());
@@ -778,7 +791,7 @@ public class OverallStepCounter : MonoBehaviour
             waitingForCloudData = false;
             cloudLoaded = false;
 
-            if (stepData != null) { onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
+            if (stepData != null) { lastBroadcastDaily = stepData.dailySteps; onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps); onLoaded?.Invoke(); }
             else LoadStepData();
 
             if (refreshCoroutine == null && PlayerPrefs.GetInt("SuppressStepQuery", 0) == 0)
@@ -798,6 +811,8 @@ public class OverallStepCounter : MonoBehaviour
             if (cloudBase == 0 && overallSteps > 0)
             {
                 Debug.LogWarning($"[CLOUD SameDay] cloudBase=0 but local overallSteps={overallSteps} — keeping local data.");
+                appOpenDeviceSteps = deviceNow;
+                appOpenCaptured = true;
                 FinalizeCloudLoad();
                 return;
             }
@@ -805,13 +820,13 @@ public class OverallStepCounter : MonoBehaviour
         ? stepData.stepsBeforeToday
         : Math.Max(0, cloudBase - cloudSavedDaily);
 
-            // if (!appOpenCaptured)
-            // {
-            //     appOpenDeviceSteps = deviceNow;
-            //     appOpenCaptured = true;
-            // }
-            appOpenDeviceSteps = deviceNow;
-            appOpenCaptured = true;
+            if (!appOpenCaptured)
+            {
+                appOpenDeviceSteps = deviceNow;
+                appOpenCaptured = true;
+            }
+            // appOpenDeviceSteps = deviceNow;
+            // appOpenCaptured = true;
             signInDeviceSteps = deviceNow;
             signedInThisSession = false;
 
@@ -822,10 +837,10 @@ public class OverallStepCounter : MonoBehaviour
 
             savedDailyBase = cloudSavedDaily;
             stepData.dailySteps = cloudSavedDaily;
-            //stepData.baselineSteps = 0;
+            stepData.baselineSteps = 0;
 
-            int impliedBaseline = Math.Max(0, deviceNow - cloudSavedDaily);
-            stepData.baselineSteps = impliedBaseline;
+            // int impliedBaseline = Math.Max(0, deviceNow - cloudSavedDaily);
+            // stepData.baselineSteps = impliedBaseline;
 
             PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
             PlayerPrefs.Save();
@@ -864,8 +879,8 @@ public class OverallStepCounter : MonoBehaviour
 
             stepData.baselineSteps = deviceNow;
 
-            savedDailyBase = stepData.dailySteps > 0 ? stepData.dailySteps : 0;
-            stepData.dailySteps = Mathf.Clamp(stepData.dailySteps, 0, overallSteps);
+            savedDailyBase = 0;
+            stepData.dailySteps = 0;
 
 
             PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
@@ -908,8 +923,8 @@ public class OverallStepCounter : MonoBehaviour
 
                 stepData.baselineSteps = deviceNow;
 
-                savedDailyBase = stepData.dailySteps > 0 ? stepData.dailySteps : 0;
-                stepData.dailySteps = Mathf.Clamp(stepData.dailySteps, 0, overallSteps);
+                savedDailyBase = 0;
+                stepData.dailySteps = 0;
 
                 PlayerPrefs.SetInt(OverallOffsetKey, deviceNow);
                 PlayerPrefs.Save();
@@ -963,10 +978,18 @@ public class OverallStepCounter : MonoBehaviour
         offsetRecalibrated = true;
         verbosePostCloudPolls = 10;
 
-        onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
+        // int liveDeviceReading = lastKnownDeviceCaptured ? lastKnownDeviceSteps : appOpenDeviceSteps;
+        // int liveDaily = CalcDailySteps(liveDeviceReading);
+        // // Clamp: daily can't exceed overall, and can't be negative
+        // liveDaily = Mathf.Clamp(liveDaily, 0, overallSteps);
+        int liveDaily = Mathf.Clamp(savedDailyBase, 0, overallSteps);
+
+        lastBroadcastDaily = liveDaily;
+
+        onStepsUpdated?.Invoke(overallSteps, liveDaily);
         onLoaded?.Invoke();
 
-        StartCoroutine(FireStepsNextFrame(overallSteps, stepData.dailySteps));
+        //StartCoroutine(FireStepsNextFrame(overallSteps, stepData.dailySteps));
 
         StopRefreshCoroutine();
         refreshCoroutine = StartCoroutine(RefreshLoop());
@@ -1067,6 +1090,7 @@ public class OverallStepCounter : MonoBehaviour
         stepData.baselineSteps = 0;
 
         WriteToDisk();
+        lastBroadcastDaily = 0;
         onStepsUpdated?.Invoke(0, 0);
 
         int gen = sessionGen;
@@ -1153,6 +1177,7 @@ public class OverallStepCounter : MonoBehaviour
         };
 
         // 5. Fire zero immediately so UI clears
+        lastBroadcastDaily = 0;
         onStepsUpdated?.Invoke(0, 0);
 
         // 6. Query device pedometer — use current reading as the new baseline
@@ -1201,6 +1226,7 @@ public class OverallStepCounter : MonoBehaviour
         Debug.LogWarning("[NewGame] Baseline query timed out — starting RefreshLoop with zero baseline.");
         beforeTodaySettled = true;
 
+        lastBroadcastDaily = 0;
         onStepsUpdated?.Invoke(0, 0);
         onLoaded?.Invoke();
 
@@ -1226,6 +1252,7 @@ public class OverallStepCounter : MonoBehaviour
         appOpenCaptured = false;
         appOpenDeviceSteps = 0;
 
+        lastBroadcastDaily = stepData.dailySteps;
         onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
 
         int gen = sessionGen;
@@ -1305,6 +1332,7 @@ public class OverallStepCounter : MonoBehaviour
         PlayerPrefs.DeleteKey("SuppressStepQuery");
         PlayerPrefs.Save();
 
+        lastBroadcastDaily = 0;
         onStepsUpdated?.Invoke(0, 0);
     }
 
@@ -1415,6 +1443,7 @@ public class OverallStepCounter : MonoBehaviour
             readyToCount = true;
 
             WriteToDisk();
+            lastBroadcastDaily = 0;
 
             onStepsUpdated?.Invoke(0, 0);
             onLoaded?.Invoke();
@@ -1582,6 +1611,7 @@ public class OverallStepCounter : MonoBehaviour
 
             overallSteps = 0;
             stepData.dailySteps = 0;
+            lastBroadcastDaily = 0;
             beforeTodaySettled = true;
             readyToCount = true;
 
@@ -1705,6 +1735,7 @@ public class OverallStepCounter : MonoBehaviour
         yield return null;
         if (!isLoggingOut)
         {
+            lastBroadcastDaily = daily;
             onStepsUpdated?.Invoke(overall, daily);
             onLoaded?.Invoke();
         }
@@ -1742,6 +1773,7 @@ public class OverallStepCounter : MonoBehaviour
 
     private void FireZero()
     {
+        lastBroadcastDaily = 0;
         onStepsUpdated?.Invoke(0, 0);
         onLoaded?.Invoke();
     }
@@ -1792,6 +1824,7 @@ public class OverallStepCounter : MonoBehaviour
         PlayerPrefs.DeleteKey(DailyOffsetKey);
 
         WriteToDisk();
+        lastBroadcastDaily = stepData.dailySteps;
         onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
 
         Debug.Log($"[NewGame] Step counter reset: overall={overallSteps}, daily={stepData.dailySteps}");
@@ -1851,6 +1884,7 @@ public class OverallStepCounter : MonoBehaviour
         stepData.overallSteps = overallSteps;
 
         WriteToDisk();
+        lastBroadcastDaily = stepData.dailySteps;
         onStepsUpdated?.Invoke(overallSteps, stepData.dailySteps);
 
         Debug.Log($"[NewGame] Steps set to: overall={overallSteps}, daily={stepData.dailySteps}");

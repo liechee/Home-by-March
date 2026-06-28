@@ -123,13 +123,15 @@ public class InventoryObject : ScriptableObject
         Save();
 
         string json = JsonUtility.ToJson(Container, true);
-        await CloudSaver.SaveDataToCloud(fileName, json);
+       // await CloudSaver.SaveDataToCloud(fileName, json);
+        await CloudSaver2.SaveData(fileName, json); // Optional second cloud save for redundancy
         Debug.Log($"[Inventory] Saved '{name}' to cloud as '{fileName}'.");
     }
 
     public async Task LoadInventoryFromCloud(string fileName)
     {
-        string json = await CloudSaver.LoadDataFromCloud(fileName);
+      //  string json2 = await CloudSaver.LoadDataFromCloud(fileName);
+        string json = await CloudSaver2.LoadData(fileName); // Optional second cloud load for redundancy
 
         if (string.IsNullOrEmpty(json))
         {

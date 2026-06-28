@@ -966,7 +966,7 @@ MonoBehaviour:
   text: {fileID: 1308380227}
   debugText: {fileID: 728768842}
   permissionCanvas: {fileID: 1493089053}
-  stepCountChannel: {fileID: 0}
+  dailyStepCount: 0
 --- !u!114 &290985608
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2443,6 +2443,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -1014233919462176944, guid: 15f32a9777aa6f24db5a5165707fed9d, type: 3}
+      propertyPath: sceneViewId
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 240495869672435250, guid: 15f32a9777aa6f24db5a5165707fed9d, type: 3}
       propertyPath: joystick
       value: 
@@ -5333,7 +5337,7 @@ Transform:
   m_GameObject: {fileID: 1787124812}
   serializedVersion: 2
   m_LocalRotation: {x: 0.3025016, y: -0.03657569, z: 0.011617474, w: 0.952376}
-  m_LocalPosition: {x: -347.26035, y: 17.360222, z: 430.9151}
+  m_LocalPosition: {x: -347.26035, y: 17.356403, z: 430.9151}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6502,14 +6506,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   levelText: {fileID: 1203679517}
+  levelTextOutside: {fileID: 0}
   currentStepCountText: {fileID: 1729890358}
+  currentStepCountTextOutside: {fileID: 0}
   totalStepsForNextLevelText: {fileID: 1636305631}
   remainingStepsForNextLevelText: {fileID: 837388605}
+  overallStepCountText: {fileID: 0}
+  percentageText: {fileID: 0}
   experienceBarImage: {fileID: 663621393}
-  currentUserLevel: 0
-  totalStepsForNextLevel: 0
+  userNameText: {fileID: 0}
+  playerData: {fileID: 0}
   currentStepCount: 0
+  dailyStepCount: 0
+  overallStepCount: 0
+  totalStepsForNextLevel: 0
   remainingStepsForNextLevel: 0
+  debugStepLogs: 0
 --- !u!224 &2074013738 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 2736275297507101324, guid: 48dffe8e9b53298499762369d56b84cf, type: 3}

@@ -1,150 +1,195 @@
-using System.Collections;
-using UnityEngine;
-using UnityEngine.SceneManagement;
-using Unity.Services.Authentication;
-using Unity.Services.Core;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Unity.Services.CloudSave;
-using System;
+using Unity.Services.Authentication;
+using Unity.Services.Authentication.PlayerAccounts;
+using Unity.Services.Core;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using Unity.Services.Authentication.PlayerAccounts.Samples;
 
+/// <summary>
+/// Signs out of the current session and reloads the login screen.
+/// Cloud data and local save data are intentionally preserved.
+///
+/// Call LogoutAndRestart() from any UI button (e.g. Scene2AuthUI.OnSignOutButtonClicked).
+/// </summary>
 public class LogOutManager : MonoBehaviour
 {
+    // ── Inspector ─────────────────────────────────────────────────────────────
+
     [Header("UI")]
     [SerializeField] private GameObject loadingPanel;
 
+    [Header("Navigation")]
+    [SerializeField] private string loginSceneName = "Log In";
+    [SerializeField] private float reloadDelay = 1.5f;
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
     public async void LogoutAndRestart()
     {
-        Debug.Log("[LOGOUT] ── Starting logout ─────────────────────────────────────");
-
-        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
-        if (stepCounter != null)
-        {
-            stepCounter.isLoggingOut = true;
-            Debug.Log("[LOGOUT] isLoggingOut set — all saves blocked.");
-        }
-
-        // Disable the sync button so it cannot fire SaveToCloud mid-wipe
-        PlayerPrefsCloudSyncButton syncButton = FindObjectOfType<PlayerPrefsCloudSyncButton>();
-        if (syncButton != null) syncButton.enabled = false;
-
-        if (UnityServices.State != ServicesInitializationState.Initialized)
-            await UnityServices.InitializeAsync();
-
-        if (AuthenticationService.Instance.IsSignedIn)
-        {
-            Debug.Log("[LOGOUT] Preserving cloud data; clearing local/session state only.");
-            AuthenticationService.Instance.SignOut(true);
-            Debug.Log("[LOGOUT] Signed out.");
-        }
-
-        NuclearDataWipe(stepCounter);
-
-        PlayerPrefs.SetInt("HasLoggedOut", 1);
-        PlayerPrefs.SetInt("SuppressCloudRestore", 1);
-        PlayerPrefs.DeleteKey("CloudRestored");
-        PlayerPrefs.DeleteKey("HasEverSignedIn");
-        PlayerPrefs.Save();
-        Debug.Log("[LOGOUT] Session flags set.");
+        Debug.Log("[LogOut] ── Starting logout ──────────────────────────────────");
 
         if (loadingPanel != null) loadingPanel.SetActive(true);
-        StartCoroutine(ReloadEntryScreen(2f));
-    }
+        await Task.Yield();
 
-    private void NuclearDataWipe(OverallStepCounter stepCounter)
-    {
+        OverallStepCounter stepCounter = FindObjectOfType<OverallStepCounter>();
+        PlayerData playerData = FindObjectOfType<PlayerData>();
+
         if (stepCounter != null)
         {
-            stepCounter.ResetStepDataCompletely();
-            Debug.Log("[LOGOUT] OverallStepCounter reset.");
+            // stepCounter.isLoggingOut = true;
+            // stepCounter.ResetStepDataForLogout(); // Use this instead of ResetStepDataCompletely
+            //stepCounter.PrepareForLogout();
+            stepCounter.RestartAsNewSession();
+            Debug.Log("[LogOut] Step data preserved for next login.");
         }
 
-        foreach (UserLevel ul in FindObjectsOfType<UserLevel>())
+        if (playerData != null)
         {
-            ul.dailyStepCount   = 0;
-            ul.overallStepCount = 0;
-            ul.currentStepCount = 0;
+            playerData.isLoggingOut = true;
+            playerData.Reset();
+            Debug.Log("[LogOut] PlayerData reset.");
         }
 
-        PlayerPrefs.DeleteAll();
+        ResetInventoryObjects();
+        DeleteLocalSaveFiles();
+        ClearPlayerPrefsForNewSession();
+
+        await EnsureServicesInitializedAsync();
+        SignOutServices();
+
+        PlayerPrefs.SetInt("HasLoggedOut", 1);
         PlayerPrefs.Save();
-        Debug.Log("[LOGOUT] PlayerPrefs cleared.");
+        Debug.Log("[LogOut] Logout flag written.");
 
-        DeleteAllFiles();
-        ResetScriptableObjects();
-        DestroyPersistentObjects(stepCounter);
-
-        Debug.Log("[LOGOUT] Nuclear wipe complete.");
+        float delay = reloadDelay;
+        string sceneName = loginSceneName;
+        await Task.Delay(TimeSpan.FromSeconds(delay));
+        SceneManager.LoadScene(sceneName);
     }
 
-    private void DeleteAllFiles()
-    {
-        string path = Application.persistentDataPath;
-        if (!Directory.Exists(path)) return;
+    // ── Service sign-out ──────────────────────────────────────────────────────
 
-        foreach (string file in Directory.GetFiles(path, "*.*", SearchOption.AllDirectories))
+    private static async Task EnsureServicesInitializedAsync()
+    {
+        if (UnityServices.State != ServicesInitializationState.Initialized)
+            await UnityServices.InitializeAsync();
+    }
+
+    /// <summary>
+    /// Signs out both PlayerAccountService and AuthenticationService in the
+    /// correct order: portal session first, auth session second.
+    /// </summary>
+    private static void SignOutServices()
+    {
+        // Sign out the portal session first.
+        if (PlayerAccountService.Instance.IsSignedIn)
+        {
+            PlayerAccountService.Instance.SignOut();
+            Debug.Log("[LogOut] PlayerAccountService signed out.");
+        }
+
+        // Sign out and clear the on-disk session token.
+        if (AuthenticationService.Instance.IsSignedIn ||
+            AuthenticationService.Instance.SessionTokenExists)
+        {
+            AuthenticationService.Instance.SignOut(clearCredentials: true);
+            AuthenticationService.Instance.ClearSessionToken();
+            Debug.Log("[LogOut] AuthenticationService signed out (credentials cleared).");
+        }
+    }
+
+    private static void ClearPlayerPrefsForNewSession()
+    {
+        PlayerPrefs.DeleteAll();
+        PlayerPrefs.SetInt("HasLoggedOut", 1);
+        PlayerPrefs.SetInt("SuppressCloudRestore", 1); // ← add this
+        PlayerPrefs.Save();
+    }
+
+    private static void DeleteLocalSaveFiles()
+    {
+        string root = Application.persistentDataPath;
+        foreach (string relativePath in GetLocalSaveFileNames())
+        {
+            DeleteFileIfExists(Path.Combine(root, relativePath));
+        }
+
+        if (!Directory.Exists(root)) return;
+
+        foreach (string datFile in Directory.GetFiles(root, "*.dat", SearchOption.AllDirectories))
+        {
+            DeleteFileIfExists(datFile);
+        }
+    }
+
+    private static IEnumerable<string> GetLocalSaveFileNames()
+    {
+        return new[]
+        {
+            "playerData.json",
+            "stepData.json",
+            "questData.json",
+            "playerPositionData.json",
+            "guestNameDraft.json",
+            "playerDailyQuestData.json",
+            "optimized_inventory.json",
+            "test.json",
+            "equipment.save",
+            "inventory.save",
+
+        };
+    }
+
+    private static void DeleteFileIfExists(string path)
+    {
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+            File.Delete(path);
+            Debug.Log($"[LogOut] Deleted local save: {Path.GetFileName(path)}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[LogOut] Could not delete {Path.GetFileName(path)}: {e.Message}");
+        }
+    }
+
+    private static void ResetInventoryObjects()
+    {
+        foreach (InventoryObject inventoryObject in Resources.FindObjectsOfTypeAll<InventoryObject>())
         {
             try
             {
-                File.SetAttributes(file, FileAttributes.Normal);
-                File.Delete(file);
-                Debug.Log($"[LOGOUT] Deleted: {Path.GetFileName(file)}");
+                inventoryObject.Clear();
+                Debug.Log($"[LogOut] Cleared inventory '{inventoryObject.name}'.");
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[LOGOUT] Could not delete {Path.GetFileName(file)}: {e.Message}");
-                try { File.WriteAllText(file, ""); File.Delete(file); }
-                catch { Debug.LogError($"[LOGOUT] Force-delete failed: {Path.GetFileName(file)}"); }
-            }
-        }
-
-        foreach (string dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
-        {
-            try { Directory.Delete(dir, true); }
-            catch (Exception e) { Debug.LogWarning($"[LOGOUT] Could not delete dir: {e.Message}"); }
-        }
-    }
-
-    private void ResetScriptableObjects()
-    {
-        foreach (InventoryObject inv in Resources.FindObjectsOfTypeAll<InventoryObject>())
-        {
-            try { inv.Container.Clear(); }
-            catch (Exception e) { Debug.LogWarning($"[LOGOUT] Could not clear {inv.name}: {e.Message}"); }
-        }
-    }
-
-    private void DestroyPersistentObjects(OverallStepCounter stepCounter)
-    {
-        GameObject self           = gameObject;
-        GameObject stepCounterObj = stepCounter != null ? stepCounter.gameObject : null;
-
-        foreach (GameObject obj in FindObjectsOfType<GameObject>())
-        {
-            if (obj == null || obj == self || obj == stepCounterObj) continue;
-            if (obj.scene.name != "DontDestroyOnLoad") continue;
-            if (obj.name.Contains("EventSystem") || obj.name.Contains("AudioListener")) continue;
-
-            try
-            {
-                Debug.Log($"[LOGOUT] Destroying: {obj.name}");
-                DestroyImmediate(obj);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[LOGOUT] Could not destroy {obj.name}: {e.Message}");
+                Debug.LogWarning($"[LogOut] Could not clear inventory '{inventoryObject.name}': {e.Message}");
             }
         }
     }
 
-    private async Task DeleteAllCloudSaveData()
+    /// <summary>
+    /// Resets player data to new game state (fresh start)
+    /// </summary>
+    public void ResetToNewGame()
     {
-        await Task.CompletedTask;
-    }
-    private IEnumerator ReloadEntryScreen(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        Debug.Log("[LOGOUT] ── Loading Entry Screen ──────────────────────────────");
-        SceneManager.LoadScene("LogIn Screen 2");
+        // Reset all player stats to default values
+        // Add your specific player data reset logic here
+
+        // Example:
+        // playerLevel = 1;
+        // playerExp = 0;
+        // playerGold = 0;
+        // etc.
+
+        Debug.Log("[NewGame] Player data reset to new game state.");
     }
 }

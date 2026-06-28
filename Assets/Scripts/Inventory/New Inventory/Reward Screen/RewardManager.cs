@@ -2,49 +2,56 @@ using UnityEngine;
 
 public class RewardManager : MonoBehaviour
 {
-    public GameObject rewardPanel; // The reward panel to show or hide
-    private const string RewardClaimedKey = "RewardClaimed"; // Key for PlayerPrefs to store the claim status
+    public GameObject rewardPanel;
+    private const string RewardClaimedKey = "RewardClaimed";
     private const string Scene1SignedInKey = "SignedInFromScene1Auth";
 
     void Start()
     {
-        if (ShouldSkipForScene1SignIn())
+        if (rewardPanel == null) return;
+
+        // Only hide for real signed-in players who already claimed
+        if (IsSignedInPlayer() && IsExistingPlayer())
+        {
+            rewardPanel.SetActive(false);
+            return;
+        }
+    }
+
+    public void ClaimReward()
+    {
+        // Only block if they're a real signed-in player who already claimed
+        if (IsSignedInPlayer() && IsExistingPlayer())
         {
             if (rewardPanel != null) rewardPanel.SetActive(false);
             return;
         }
 
-        // Check if the reward has already been claimed
-        if (PlayerPrefs.GetInt(RewardClaimedKey, 0) == 1)
-        {
-            // If the reward has been claimed, set the panel inactive
-            rewardPanel.SetActive(false);
-        }
-        else
-        {
-            // If not claimed, show the reward panel
-            rewardPanel.SetActive(true);
-        }
-    }
-
-    // Call this method when the player claims the reward
-    public void ClaimReward()
-    {
-        // Mark the reward as claimed in PlayerPrefs
         PlayerPrefs.SetInt(RewardClaimedKey, 1);
+        PlayerPrefs.SetInt("IsNewRegistration", 0);
         PlayerPrefs.Save();
 
-        // Set the reward panel inactive after claiming
-        rewardPanel.SetActive(false);
+        if (rewardPanel != null) rewardPanel.SetActive(false);
+
+        Debug.Log("Reward granted.");
     }
 
-    private bool ShouldSkipForScene1SignIn()
+    public bool IsExistingPlayer()
     {
-        if (PlayerPrefs.GetInt(Scene1SignedInKey, 0) != 1)
-            return false;
+        return PlayerPrefs.GetInt(RewardClaimedKey, 0) == 1;
+    }
 
-        PlayerPrefs.DeleteKey(Scene1SignedInKey);
-        PlayerPrefs.Save();
-        return true;
+    private bool IsSignedInPlayer()
+    {
+        if (AuthManager.Instance == null) return false;
+        bool isRealSignedIn = AuthManager.Instance.IsSignedIn && !AuthManager.Instance.IsGuest;
+        bool isNewRegistration = PlayerPrefs.GetInt("IsNewRegistration", 0) == 1;
+        bool isGuestUpgrade = PlayerPrefs.GetInt("IsGuestUpgrade", 0) == 1;
+
+        // Guest upgrades are already signed in with claimed rewards — treat as returning player
+        if (isGuestUpgrade) return isRealSignedIn;
+
+        // Brand new registrants still need to see and claim the reward
+        return isRealSignedIn && !isNewRegistration;
     }
 }

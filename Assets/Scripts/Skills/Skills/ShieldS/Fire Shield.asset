@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   uiDisplay: {fileID: 21300000, guid: 0930603bd1c7fce4cb8871019b68c902, type: 3}
   spellName: Blaze Aegis
-  description: Gain +30 Defense and summon a fiery shield from the Fire Hat to absorb
+  description: Gain +20 Defense and summon a fiery shield from the Fire Hat to absorb
     damage with searing power. As it fades, it emboldens the wearer with a surge
     of fiery determination.
   shieldPrefab: {fileID: 8460317685369823947, guid: 9e660ba70afa72749bd2ada41aa3c28c, type: 3}

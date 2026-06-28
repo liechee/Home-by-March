@@ -16,6 +16,7 @@ public class StepData
   public int numberOfSteps;
   public int dailySteps;
   public int overallSteps;
+  public int stepsBeforeToday; // ADD THIS - Steps recorded before today (used to calculate daily steps on new day)
 
 //--------------------------
   public int baselineSteps; // ADD THIS - Device steps at logout time
@@ -28,6 +29,7 @@ public class StepData
     numberOfSteps = 0;
     overallSteps = 0;
     dailySteps = 0;
+    stepsBeforeToday = 0; // Initialize to 0
     baselineSteps = 0; // Initialize to 0
   }
 }
@@ -59,6 +61,7 @@ public class DailyQuestProgress
 }
 
 
+[System.Serializable]
 public class PlayerDataSaver
 {
   public string playerName;

@@ -390,13 +390,16 @@ namespace CoppraGames
         public async Task SaveDailyQuestProgressToCloud()
         {
 
-           await CloudSaver.SaveDataToCloud("dailyQuestProgress", dailyQuestProgress);
+          // await CloudSaver.SaveDataToCloud("dailyQuestProgress", dailyQuestProgress);
+           await CloudSaver2.SaveData("dailyQuestProgress", dailyQuestProgress);
 
         }
 
         public async Task LoadPlayerDataFromCloud()
         {
-            string dailyQuestProgressJson = await CloudSaver.LoadDataFromCloud("dailyQuestProgress");
+           // string dailyQuestProgressJson = await CloudSaver.LoadDataFromCloud("dailyQuestProgress");
+            string dailyQuestProgressJson = await CloudSaver2.LoadData("dailyQuestProgress");
+
             dailyQuestProgress.areDailyQuestsClaimed = JsonUtility.FromJson<DailyQuestProgress>(dailyQuestProgressJson).areDailyQuestsClaimed;
 
 

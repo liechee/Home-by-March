@@ -5242,7 +5242,7 @@ GameObject:
   - component: {fileID: 507941527}
   - component: {fileID: 507941526}
   m_Layer: 5
-  m_Name: GameObject
+  m_Name: OverallStep count
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5257,16 +5257,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 507941525}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 444e73ae44262624e88007c601d84d45, type: 3}
+  m_Script: {fileID: 11500000, guid: 003fc43594f913f42bff87716301e532, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  refreshInterval: 2
+  refreshInterval: 0.1
   stepChangeThreshold: 1
   debugStepQueries: 0
   diskSaveInterval: 5
   stepData:
-    lastSaveTime: 
-    registrationTime: 
+    lastSaveTime: 2026-06-28
+    registrationTime: 2026-06-28
     numberOfSteps: 0
     dailySteps: 0
     overallSteps: 0
@@ -5274,6 +5274,7 @@ MonoBehaviour:
     baselineSteps: 0
     version: 1.0
   overallSteps: 0
+  daily: 0
   overallStepsBeforeToday: 0
   cloudLoaded: 0
   stepDataJsonFilePath: 

@@ -353,6 +353,7 @@ public class AccountHubUI : MonoBehaviour
         PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
         PlayerPrefs.SetInt("IsGuestSession", 0);
         PlayerPrefs.DeleteKey("SuppressCloudRestore");
+        PlayerPrefs.SetInt("IsNewRegistration", 0);
         PlayerPrefs.Save();
 
         // Links credentials to the existing guest player ID — all cloud data carries over.

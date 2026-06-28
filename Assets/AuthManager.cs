@@ -371,6 +371,7 @@ public class AuthManager : MonoBehaviour
             PlayerPrefs.SetString("LastLoginMethod", "UsernamePassword");
             PlayerPrefs.SetString("LastSignedInPlayer", username);
             PlayerPrefs.SetInt(PrefPlayerSignedIn, 1);
+            PlayerPrefs.SetInt("IsNewRegistration", 1);
             PlayerPrefs.Save();
 
             IsInteractiveAuthInProgress = false;

@@ -52,6 +52,14 @@ public class OneTimeAccess : MonoBehaviour
     private bool IsSignedInPlayer()
     {
         if (AuthManager.Instance == null) return false;
-        return AuthManager.Instance.IsSignedIn && !AuthManager.Instance.IsGuest;
+        bool isRealSignedIn = AuthManager.Instance.IsSignedIn && !AuthManager.Instance.IsGuest;
+        bool isNewRegistration = PlayerPrefs.GetInt("IsNewRegistration", 0) == 1;
+        bool isGuestUpgrade = PlayerPrefs.GetInt("IsGuestUpgrade", 0) == 1;
+
+        // Guest upgrades are already signed in with claimed rewards — treat as returning player
+        if (isGuestUpgrade) return isRealSignedIn;
+
+        // Brand new registrants still need to see and claim the reward
+        return isRealSignedIn && !isNewRegistration;
     }
 }
